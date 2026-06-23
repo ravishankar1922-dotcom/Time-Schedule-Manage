@@ -1,0 +1,1784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Time Schedule Tracker — Datamatics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCQpHQb_j0pn2SRUmKR5wUGaf4bYH_3yi0",
+  authDomain: "time-schedule-tracker.firebaseapp.com",
+  projectId: "time-schedule-tracker",
+  storageBucket: "time-schedule-tracker.firebasestorage.app",
+  messagingSenderId: "67296866406",
+  appId: "1:67296866406:web:7a7656b5f5b7ed20ec7da7",
+  measurementId: "G-5ZK07W50DT"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window._firestore = { db, doc, setDoc, getDoc, onSnapshot };
+window._firebaseReady = true;
+window.dispatchEvent(new Event('firebaseReady'));
+</script>
+<style>
+/* ========== DESIGN TOKENS ========== */
+:root {
+  --bg:#f8fafc; --surface:#ffffff; --surface-2:#f1f5f9; --surface-3:#eef2ff;
+  --border:#e2e8f0; --text:#0f172a; --text-muted:#64748b; --text-faint:#94a3b8;
+  --primary:#6366f1; --primary-dark:#4f46e5; --primary-light:#818cf8;
+  --gradient:linear-gradient(135deg,#6366f1 0%,#a855f7 100%);
+  --brand-red:#c8102e;
+  --success:#10b981; --success-bg:#d1fae5; --success-text:#065f46;
+  --warning:#f59e0b; --warning-bg:#fef3c7; --warning-text:#92400e;
+  --danger:#ef4444; --danger-bg:#fee2e2; --danger-text:#991b1b;
+  --info:#3b82f6; --info-bg:#dbeafe;
+  --shadow-sm:0 1px 2px rgba(15,23,42,.06); --shadow-md:0 4px 14px rgba(15,23,42,.08); --shadow-lg:0 16px 40px rgba(15,23,42,.16);
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:22px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;-webkit-font-smoothing:antialiased;}
+.icon{flex-shrink:0;vertical-align:middle;}
+.spin{animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.96) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);}}
+@keyframes slideUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+@keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+
+/* ========== LOADING ========== */
+.loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:5000;transition:opacity .3s;}
+.spinner{width:38px;height:38px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;}
+.loading-text{font-size:13px;color:var(--text-muted);font-weight:600;}
+
+/* ========== LOGIN SCREEN ========== */
+#loginScreen{display:none;position:fixed;inset:0;z-index:2000;overflow:hidden;}
+.login-bg{position:absolute;inset:0;background:linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%);}
+.login-orbs{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.35;animation:float 6s ease-in-out infinite;}
+.orb-1{width:500px;height:500px;background:#6366f1;top:-150px;left:-100px;animation-delay:0s;}
+.orb-2{width:400px;height:400px;background:#a855f7;bottom:-100px;right:-80px;animation-delay:2s;}
+.orb-3{width:300px;height:300px;background:#ec4899;top:40%;left:40%;animation-delay:4s;}
+.login-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:60px 60px;}
+.login-container{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
+.login-card{background:rgba(255,255,255,.07);backdrop-filter:blur(40px);border:1px solid rgba(255,255,255,.12);border-radius:28px;padding:48px 44px;width:100%;max-width:460px;box-shadow:0 32px 80px rgba(0,0,0,.4);animation:scaleIn .5s cubic-bezier(.34,1.56,.64,1);}
+.login-logo-wrap{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:36px;}
+.login-logo{width:52px;height:52px;border-radius:16px;background:var(--brand-red);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:24px;box-shadow:0 8px 24px rgba(200,16,46,.4);}
+.login-brand{display:flex;flex-direction:column;}
+.login-brand-name{font-size:20px;font-weight:800;color:#fff;letter-spacing:-.01em;}
+.login-brand-sub{font-size:11.5px;color:rgba(255,255,255,.5);font-weight:600;margin-top:1px;}
+.login-divider{height:1px;background:rgba(255,255,255,.1);margin-bottom:32px;}
+.login-heading{font-size:26px;font-weight:800;color:#fff;letter-spacing:-.02em;margin-bottom:6px;}
+.login-subheading{font-size:13.5px;color:rgba(255,255,255,.5);margin-bottom:28px;}
+.login-field{margin-bottom:18px;}
+.login-label{display:block;font-size:11.5px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+.login-select,.login-input{width:100%;padding:13px 16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:12px;color:#fff;font-size:14px;font-family:inherit;transition:border-color .2s,background .2s;outline:none;}
+.login-select option{background:#302b63;color:#fff;}
+.login-select:focus,.login-input:focus{border-color:rgba(99,102,241,.7);background:rgba(255,255,255,.12);box-shadow:0 0 0 3px rgba(99,102,241,.2);}
+.login-input::placeholder{color:rgba(255,255,255,.3);}
+.login-btn{width:100%;padding:15px;background:var(--gradient);border:none;border-radius:14px;color:#fff;font-size:15px;font-weight:800;cursor:pointer;margin-top:8px;box-shadow:0 8px 24px rgba(99,102,241,.4);transition:transform .15s,box-shadow .15s;font-family:inherit;letter-spacing:.01em;}
+.login-btn:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(99,102,241,.5);}
+.login-btn:active{transform:translateY(0);}
+.login-btn:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+.login-error{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#fca5a5;padding:11px 14px;border-radius:10px;font-size:13px;font-weight:600;margin-bottom:16px;display:none;}
+.login-footer{text-align:center;margin-top:28px;font-size:12px;color:rgba(255,255,255,.3);}
+.login-footer span{color:rgba(99,102,241,.8);font-weight:700;}
+/* First login notice */
+.first-login-notice{background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:12.5px;color:rgba(255,255,255,.7);display:none;}
+.first-login-notice strong{color:#a5b4fc;}
+
+/* ========== APP SHELL ========== */
+#appShell{display:none;}
+.header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.header-left{display:flex;align-items:center;gap:12px;}
+.logo{width:42px;height:42px;border-radius:13px;background:var(--brand-red);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px;box-shadow:var(--shadow-md);}
+.header-titles{display:flex;flex-direction:column;}
+.header-title{font-size:16px;font-weight:800;letter-spacing:-.01em;}
+.header-sub{font-size:11.5px;color:var(--text-muted);font-weight:600;margin-top:1px;}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.header-admin{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-left:8px;margin-left:4px;border-left:1px solid var(--border);}
+.btn-quick{background:var(--gradient);color:#fff;border:none;padding:10px 18px;border-radius:12px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;box-shadow:var(--shadow-md);transition:transform .15s,box-shadow .15s;}
+.btn-quick:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg);}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;border:none;font-family:inherit;}
+.pill-neutral{background:var(--surface-2);color:var(--text-muted);}
+.pill-sync{background:var(--success-bg);color:var(--success-text);cursor:pointer;transition:background .2s;}
+.pill-sync.saving{background:var(--warning-bg);color:var(--warning-text);}
+.pill-sync.error{background:var(--danger-bg);color:var(--danger-text);}
+select.user-select{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text);cursor:pointer;}
+.container{max-width:1450px;margin:0 auto;padding:28px 24px 64px;}
+.leave-banner{display:none;align-items:center;gap:10px;background:var(--warning-bg);color:var(--warning-text);padding:12px 16px;border-radius:var(--r-md);font-weight:700;font-size:13px;margin-bottom:20px;border:1px solid #fde68a;}
+.tabs{display:inline-flex;gap:4px;background:var(--surface-2);padding:5px;border-radius:14px;margin-bottom:26px;overflow-x:auto;max-width:100%;}
+.tab{display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border-radius:10px;border:none;background:transparent;color:var(--text-muted);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;transition:all .2s;}
+.tab:hover{color:var(--text);}
+.tab.active{background:var(--surface);color:var(--primary-dark);box-shadow:var(--shadow-sm);}
+.section{display:none;}
+.section.active{display:block;animation:fadeIn .25s ease;}
+.section-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:14px;}
+.section-title{font-size:21px;font-weight:800;letter-spacing:-.02em;}
+.section-subtitle{font-size:13px;color:var(--text-muted);margin-top:3px;}
+.buttons{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:10px;border:1px solid transparent;cursor:pointer;font-weight:700;font-size:12.5px;transition:all .15s;box-shadow:var(--shadow-sm);font-family:inherit;}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-md);}
+.btn-secondary{background:var(--surface);color:var(--text);border-color:var(--border);}
+.btn-primary{background:var(--primary);color:#fff;}
+.btn-primary:hover{background:var(--primary-dark);}
+.btn-amber{background:var(--warning);color:#fff;}
+.btn-green{background:var(--success);color:#fff;}
+.btn-ghost{background:transparent;color:var(--text-muted);border-color:var(--border);}
+.btn.active-toggle{background:var(--primary);color:#fff;}
+.btn-sm{padding:6px 12px;font-size:11px;}
+.date-input{padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;background:var(--surface);font-family:inherit;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:22px;}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px 20px;position:relative;overflow:hidden;box-shadow:var(--shadow-sm);transition:transform .2s,box-shadow .2s;}
+.stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);}
+.stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary);}
+.stat.pending::before{background:var(--warning);}
+.stat.completed::before{background:var(--success);}
+.stat.risk::before{background:var(--danger);}
+.stat-label{font-size:10.5px;font-weight:800;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
+.stat-value{font-size:27px;font-weight:800;letter-spacing:-.02em;}
+.quicknav-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:8px;}
+.quicknav-card{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;cursor:pointer;text-align:left;transition:all .2s;box-shadow:var(--shadow-sm);width:100%;font-family:inherit;}
+.quicknav-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--primary-light);}
+.quicknav-icon{width:40px;height:40px;border-radius:11px;background:var(--surface-3);color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.quicknav-label{font-weight:800;font-size:13.5px;}
+.quicknav-sub{font-size:11.5px;color:var(--text-muted);margin-top:2px;}
+.subtabs{display:flex;gap:20px;border-bottom:1px solid var(--border);margin-bottom:18px;}
+.subtab{padding:10px 2px;background:none;border:none;cursor:pointer;font-weight:700;font-size:13px;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;}
+.subtab.active{color:var(--primary-dark);border-bottom-color:var(--primary);}
+.filter-bar{background:var(--surface);border:1px solid var(--border);padding:12px 14px;border-radius:var(--r-md);margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.filter-label{font-weight:800;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;}
+.filter-select,.filter-input{padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;background:var(--surface);font-family:inherit;}
+.filter-select:focus,.filter-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,.15);}
+.table-container{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:auto;box-shadow:var(--shadow-sm);}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:620px;}
+th{background:var(--surface-2);padding:11px 14px;text-align:left;font-weight:800;font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:11px 14px;border-bottom:1px solid var(--border);color:var(--text);}
+tbody tr{transition:background .15s;}
+tbody tr:hover{background:var(--surface-2);}
+tbody tr:last-child td{border-bottom:none;}
+.empty-row{text-align:center;color:var(--text-faint);padding:34px 16px;}
+.badge{display:inline-flex;align-items:center;font-size:9.5px;font-weight:800;padding:3px 8px;border-radius:999px;margin-left:6px;text-transform:uppercase;letter-spacing:.03em;}
+.badge-daily{background:var(--success-bg);color:var(--success-text);}
+.badge-ageing{background:var(--danger-bg);color:var(--danger-text);}
+.badge-zero{color:var(--warning);font-weight:800;}
+.target-cell{font-weight:700;white-space:nowrap;}
+.target-cell.sla-amber{color:var(--warning-text);}
+.target-cell.sla-crossed{color:var(--danger-text);font-weight:800;}
+.sla-remark-badge{display:inline-flex;align-items:center;font-size:9.5px;font-weight:800;padding:3px 8px;border-radius:999px;margin-left:6px;white-space:nowrap;}
+.sla-remark-badge.amber{background:var(--warning-bg);color:var(--warning-text);}
+.sla-remark-badge.crossed{background:var(--danger-bg);color:var(--danger-text);}
+.subtotal-row td{background:var(--surface-3);font-weight:700;}
+.total-row td{background:#e0e7ff;font-weight:800;border-top:2px solid var(--primary);}
+.action-btn{padding:7px 13px;background:var(--success);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:800;display:inline-flex;align-items:center;gap:5px;transition:all .15s;font-family:inherit;}
+.action-btn:hover:not(:disabled){background:#059669;}
+.action-btn:disabled{background:var(--surface-2);color:var(--text-muted);cursor:not-allowed;}
+.action-btn.partial{background:var(--warning);}
+.action-btn.partial:hover:not(:disabled){background:#d97706;}
+input[type=number]{width:70px;padding:6px 8px;border:1px solid var(--border);border-radius:7px;font-size:12px;text-align:center;font-family:inherit;}
+input[type=number]:focus{outline:none;border-color:var(--primary);}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);z-index:300;align-items:center;justify-content:center;padding:20px;}
+.modal-bg.open{display:flex;}
+.modal{background:var(--surface);border-radius:var(--r-xl);padding:32px;max-width:560px;width:100%;box-shadow:var(--shadow-lg);animation:scaleIn .25s ease;max-height:90vh;overflow-y:auto;}
+.modal-title{font-size:18px;font-weight:800;margin-bottom:20px;letter-spacing:-.01em;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-group{display:flex;flex-direction:column;gap:6px;}
+.form-group.full{grid-column:1/-1;}
+label{font-size:11.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;}
+input[type=text],input[type=password],input[type=time],select.form-select,textarea{padding:10px 12px;border:1px solid var(--border);border-radius:9px;font-size:13px;font-family:inherit;background:var(--surface);width:100%;transition:border-color .2s,box-shadow .2s;}
+input[type=text]:focus,input[type=password]:focus,input[type=time]:focus,select.form-select:focus,textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,.15);}
+textarea{resize:vertical;min-height:70px;}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
+.toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:10px;}
+.toast{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-lg);font-size:13px;font-weight:600;min-width:280px;animation:scaleIn .25s ease;}
+.toast.success{border-left:4px solid var(--success);}
+.toast.error{border-left:4px solid var(--danger);}
+.toast.info{border-left:4px solid var(--info);}
+.responsible-search-row{margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:20px;}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:22px;box-shadow:var(--shadow-sm);}
+.chart-title{font-size:14px;font-weight:800;margin-bottom:16px;color:var(--text);}
+.activity-feed{display:flex;flex-direction:column;gap:0;}
+.activity-item{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);}
+.activity-item:last-child{border-bottom:none;}
+.activity-dot{width:10px;height:10px;border-radius:50%;background:var(--primary);margin-top:5px;flex-shrink:0;}
+.activity-content{flex:1;}
+.activity-meta{font-size:11px;color:var(--text-faint);margin-top:3px;}
+.info-box{background:var(--info-bg);border:1px solid #bfdbfe;border-radius:var(--r-md);padding:14px 16px;font-size:13px;color:#1e40af;margin-bottom:18px;}
+.danger-box{background:var(--danger-bg);border:1px solid #fecaca;border-radius:var(--r-md);padding:14px 16px;font-size:13px;color:var(--danger-text);margin-bottom:18px;}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Connecting to database…</div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ======================== LOGIN SCREEN ======================== -->
+<div id="loginScreen">
+  <div class="login-bg"></div>
+  <div class="login-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+  <div class="login-grid"></div>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-logo-wrap">
+        <div class="login-logo">D</div>
+        <div class="login-brand">
+          <div class="login-brand-name">Datamatics</div>
+          <div class="login-brand-sub">Global Services Ltd.</div>
+        </div>
+      </div>
+      <div class="login-divider"></div>
+      <div class="login-heading">Welcome back</div>
+      <div class="login-subheading">Sign in to your Time Schedule Tracker</div>
+
+      <div class="first-login-notice" id="firstLoginNotice">
+        <strong>First time login detected.</strong> Please set your password below — you'll use this every time you log in.
+      </div>
+      <div class="login-error" id="loginError"></div>
+
+      <div class="login-field">
+        <label class="login-label">Select your name</label>
+        <select class="login-select" id="loginUserSelect">
+          <option value="">— Choose your name —</option>
+        </select>
+      </div>
+      <div class="login-field" id="loginPasswordField">
+        <label class="login-label" id="loginPasswordLabel">Password</label>
+        <input type="password" class="login-input" id="loginPassword" placeholder="Enter your password" autocomplete="current-password">
+      </div>
+      <div class="login-field" id="loginConfirmField" style="display:none;">
+        <label class="login-label">Confirm Password</label>
+        <input type="password" class="login-input" id="loginConfirm" placeholder="Re-enter your password">
+      </div>
+      <button class="login-btn" id="loginBtn" onclick="doLogin()">Sign In</button>
+      <div class="login-footer">Time Schedule Tracker &nbsp;·&nbsp; <span>Datamatics Operations</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== APP SHELL ======================== -->
+<div id="appShell">
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">D</div>
+      <div class="header-titles">
+        <div class="header-title">Time Schedule Tracker</div>
+        <div class="header-sub">Datamatics Global Services</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="pill pill-neutral" id="headerDate">—</span>
+      <span class="pill pill-neutral" id="headerISTTime">IST —:—</span>
+      <span class="pill pill-neutral" id="headerUserPill">—</span>
+      <span class="pill pill-sync" id="syncPill" onclick="forceSave()">● Synced</span>
+      <div class="header-admin" id="headerAdminArea"></div>
+      <button class="btn-quick" id="headerQuickLogBtn">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Log Activity
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()">Sign Out</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="leave-banner" id="leaveBanner">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span id="leaveBannerText">Today is a holiday / leave day</span>
+    </div>
+
+    <nav class="tabs" id="mainTabs"></nav>
+
+    <!-- DASHBOARD -->
+    <div class="section" id="sec-dashboard">
+      <div class="section-header">
+        <div><div class="section-title">Dashboard</div><div class="section-subtitle" id="dashSubtitle">Overview for today</div></div>
+        <div class="buttons">
+          <input type="date" class="date-input" id="dashDate" onchange="renderDashboard()">
+          <button class="btn btn-secondary" onclick="exportAuditLog()">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Audit Log
+          </button>
+        </div>
+      </div>
+      <div class="stats" id="dashStats"></div>
+      <div class="section-title" style="font-size:15px;margin-bottom:14px;">Quick Actions</div>
+      <div class="quicknav-grid" id="quickNavGrid"></div>
+    </div>
+
+    <!-- SCHEDULE -->
+    <div class="section" id="sec-schedule">
+      <div class="section-header">
+        <div><div class="section-title">My Schedule</div><div class="section-subtitle" id="scheduleSubtitle"></div></div>
+        <div class="buttons">
+          <input type="date" class="date-input" id="scheduleDate" onchange="renderSchedule()">
+          <button class="btn btn-secondary" onclick="importExcel()">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Import Excel
+          </button>
+          <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImport(event)">
+          <button class="btn btn-secondary" onclick="exportExcel()">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Excel
+          </button>
+          <button class="btn btn-primary" onclick="openAddTaskModal()">+ Add Task</button>
+        </div>
+      </div>
+      <div class="subtabs" id="scheduleSubtabs"></div>
+      <div class="responsible-search-row">
+        <span class="filter-label">Filter:</span>
+        <input type="text" class="filter-input" id="scheduleSearch" placeholder="Search task / company…" oninput="renderScheduleTable()" style="width:220px;">
+        <select class="filter-select" id="scheduleFilterCompany" onchange="renderScheduleTable()">
+          <option value="">All Companies</option>
+        </select>
+        <select class="filter-select" id="scheduleFilterDept" onchange="renderScheduleTable()">
+          <option value="">All Depts</option>
+        </select>
+      </div>
+      <div class="table-container"><table id="scheduleTable"><thead></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- VOLUME -->
+    <div class="section" id="sec-volume">
+      <div class="section-header">
+        <div><div class="section-title">Volume Tracker</div><div class="section-subtitle">Daily volume & pending items</div></div>
+        <div class="buttons">
+          <input type="date" class="date-input" id="volumeDate" onchange="renderVolume()">
+          <button class="btn btn-primary" onclick="openAddVolumeModal()">+ Add Volume Item</button>
+        </div>
+      </div>
+      <div class="subtabs" id="volumeSubtabs"></div>
+      <div class="table-container"><table id="volumeTable"><thead></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- LEADERSHIP (Leadership only) -->
+    <div class="section" id="sec-leadership">
+      <div class="section-header">
+        <div><div class="section-title">Leadership Activities</div><div class="section-subtitle">Track leadership tasks</div></div>
+        <div class="buttons">
+          <input type="date" class="date-input" id="leadershipDate" onchange="renderLeadership()">
+          <button class="btn btn-primary" onclick="openAddLeadershipModal()">+ Add Activity</button>
+        </div>
+      </div>
+      <div class="table-container"><table id="leadershipTable"><thead></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- ANALYTICS (Leadership only) -->
+    <div class="section" id="sec-analytics">
+      <div class="section-header">
+        <div><div class="section-title">Analytics</div><div class="section-subtitle">Team performance overview</div></div>
+        <div class="buttons">
+          <select class="filter-select" id="analyticsRange" onchange="renderAnalytics()">
+            <option value="7">Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30" selected>Last 30 days</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-grid" id="analyticsGrid"></div>
+    </div>
+
+    <!-- MANAGE TEAM (Leadership only) -->
+    <div class="section" id="sec-team">
+      <div class="section-header">
+        <div><div class="section-title">Manage Team</div><div class="section-subtitle">Members, passwords & roles</div></div>
+        <div class="buttons">
+          <button class="btn btn-primary" onclick="openAddMemberModal()">+ Add Member</button>
+        </div>
+      </div>
+      <div class="table-container"><table id="teamTable"><thead></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- HOLIDAYS (Leadership only) -->
+    <div class="section" id="sec-holidays">
+      <div class="section-header">
+        <div><div class="section-title">Holidays & Leaves</div><div class="section-subtitle">Mark non-working days</div></div>
+        <div class="buttons">
+          <button class="btn btn-primary" onclick="openAddHolidayModal()">+ Add Holiday / Leave</button>
+        </div>
+      </div>
+      <div class="table-container"><table id="holidaysTable"><thead></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- ACTIVITY FEED -->
+    <div class="section" id="sec-activity">
+      <div class="section-header">
+        <div><div class="section-title">Activity Feed</div><div class="section-subtitle">Recent team actions</div></div>
+        <div class="buttons">
+          <button class="btn btn-ghost" onclick="renderActivity()">↻ Refresh</button>
+        </div>
+      </div>
+      <div class="activity-feed" id="activityFeed"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODALS ===== -->
+<!-- Add Task Modal -->
+<div class="modal-bg" id="addTaskModal">
+  <div class="modal">
+    <div class="modal-title" id="addTaskModalTitle">Add Task</div>
+    <div class="form-grid">
+      <div class="form-group full"><label>Task Name</label><input type="text" id="taskName" placeholder="e.g. Invoice Processing"></div>
+      <div class="form-group"><label>Company</label>
+        <select class="form-select" id="taskCompany">
+          <option>TSL</option><option>SIRF</option><option>SIAS</option><option>Argomm</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Department</label>
+        <select class="form-select" id="taskDept">
+          <option>AP</option><option>AR</option><option>GL</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Responsible</label>
+        <select class="form-select" id="taskResponsible"></select>
+      </div>
+      <div class="form-group"><label>Task Type</label>
+        <select class="form-select" id="taskType">
+          <option value="daily">Daily</option>
+          <option value="ageing">Ageing</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Start Time</label><input type="time" id="taskStart"></div>
+      <div class="form-group"><label>End Time (Target SLA)</label><input type="time" id="taskEnd"></div>
+      <div class="form-group"><label>Volume / Count</label><input type="number" id="taskVolume" min="0" style="width:100%"></div>
+      <div class="form-group full"><label>Remarks</label><textarea id="taskRemarks" rows="2" placeholder="Optional notes…"></textarea></div>
+      <div class="form-group full" id="carryForwardGroup">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-size:13px;font-weight:600;">
+          <input type="checkbox" id="taskCarryForward" style="width:16px;height:16px;"> Carry forward to tomorrow
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addTaskModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTask()">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Volume Modal -->
+<div class="modal-bg" id="addVolumeModal">
+  <div class="modal">
+    <div class="modal-title">Add Volume Item</div>
+    <div class="form-grid">
+      <div class="form-group full"><label>Description</label><input type="text" id="volDesc" placeholder="e.g. Invoices received"></div>
+      <div class="form-group"><label>Company</label>
+        <select class="form-select" id="volCompany">
+          <option>TSL</option><option>SIRF</option><option>SIAS</option><option>Argomm</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Department</label>
+        <select class="form-select" id="volDept">
+          <option>AP</option><option>AR</option><option>GL</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Opening</label><input type="number" id="volOpening" min="0" style="width:100%"></div>
+      <div class="form-group"><label>Received</label><input type="number" id="volReceived" min="0" style="width:100%"></div>
+      <div class="form-group"><label>Processed</label><input type="number" id="volProcessed" min="0" style="width:100%"></div>
+      <div class="form-group full"><label>Remarks</label><textarea id="volRemarks" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addVolumeModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveVolumeItem()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Leadership Modal -->
+<div class="modal-bg" id="addLeadershipModal">
+  <div class="modal">
+    <div class="modal-title">Add Leadership Activity</div>
+    <div class="form-grid">
+      <div class="form-group full"><label>Activity</label><input type="text" id="ldActivity" placeholder="e.g. Team huddle, Review meeting…"></div>
+      <div class="form-group"><label>Category</label>
+        <select class="form-select" id="ldCategory">
+          <option>Team Management</option><option>Reporting</option><option>Process Improvement</option><option>Training</option><option>Escalation</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Duration (mins)</label><input type="number" id="ldDuration" min="0" style="width:100%"></div>
+      <div class="form-group full"><label>Notes</label><textarea id="ldNotes" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addLeadershipModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLeadershipActivity()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Member Modal -->
+<div class="modal-bg" id="addMemberModal">
+  <div class="modal">
+    <div class="modal-title" id="addMemberModalTitle">Add Team Member</div>
+    <div class="form-grid">
+      <div class="form-group full"><label>Full Name</label><input type="text" id="memberName" placeholder="e.g. Priya Sharma"></div>
+      <div class="form-group"><label>Role</label>
+        <select class="form-select" id="memberRole">
+          <option value="Process">Process</option>
+          <option value="Leadership">Leadership</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Department</label>
+        <select class="form-select" id="memberDept">
+          <option>AP</option><option>AR</option><option>GL</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group full" id="memberPasswordGroup">
+        <label>Set Password (optional — member sets own on first login)</label>
+        <input type="password" id="memberPassword" placeholder="Leave blank for first-login setup">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addMemberModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMember()">Save Member</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Holiday Modal -->
+<div class="modal-bg" id="addHolidayModal">
+  <div class="modal">
+    <div class="modal-title">Add Holiday / Leave</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Date</label><input type="date" id="holidayDate"></div>
+      <div class="form-group"><label>Type</label>
+        <select class="form-select" id="holidayType">
+          <option value="holiday">Holiday</option>
+          <option value="leave">Team Leave</option>
+        </select>
+      </div>
+      <div class="form-group full"><label>Description</label><input type="text" id="holidayDesc" placeholder="e.g. Diwali, Tamil Nadu Govt Holiday…"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addHolidayModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveHoliday()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Log Modal -->
+<div class="modal-bg" id="quickLogModal">
+  <div class="modal">
+    <div class="modal-title">Quick Log Activity</div>
+    <div class="form-grid">
+      <div class="form-group full"><label>Task</label>
+        <select class="form-select" id="qlTask"></select>
+      </div>
+      <div class="form-group"><label>Status</label>
+        <select class="form-select" id="qlStatus">
+          <option value="done">Completed</option>
+          <option value="partial">Partial</option>
+          <option value="pending">Pending</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Actual Time</label><input type="time" id="qlActual"></div>
+      <div class="form-group full"><label>Remarks</label><textarea id="qlRemarks" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('quickLogModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveQuickLog()">Save Log</button>
+    </div>
+  </div>
+</div>
+
+<!-- Email Report Modal -->
+<div class="modal-bg" id="emailReportModal">
+  <div class="modal">
+    <div class="modal-title">Send Email Report</div>
+    <div class="form-grid">
+      <div class="form-group full"><label>Report Date</label><input type="date" id="emailReportDate"></div>
+      <div class="form-group full"><label>To Email(s)</label><input type="text" id="emailTo" placeholder="comma separated emails"></div>
+    </div>
+    <div id="emailPreview" style="margin-top:16px;max-height:300px;overflow:auto;background:var(--surface-2);border-radius:var(--r-md);padding:14px;font-size:12px;white-space:pre-wrap;font-family:monospace;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('emailReportModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="sendEmailReport()">Copy & Open Mail</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// CONSTANTS & STATE
+// ══════════════════════════════════════════════
+const STORAGE_KEY = 'tracker_data_v1';
+let DB = null; // Firestore instance
+let unsubscribe = null;
+let saveTimeout = null;
+let isSaving = false;
+
+let state = {
+  members: [],
+  tasks: {},       // { dateKey: [task,...] }
+  volume: {},      // { dateKey: [item,...] }
+  leadership: {},  // { dateKey: [act,...] }
+  holidays: [],
+  activityLog: [],
+  passwords: {}    // { memberName: hashedPw }
+};
+
+let currentUser = null; // { name, role, dept }
+let editingTaskId = null;
+let editingMemberId = null;
+
+// ══════════════════════════════════════════════
+// FIREBASE HELPERS
+// ══════════════════════════════════════════════
+async function loadFromFirebase() {
+  const { db, doc, getDoc } = window._firestore;
+  try {
+    const ref = doc(db, 'tracker', STORAGE_KEY);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data();
+      state = Object.assign(state, data);
+    }
+  } catch(e) {
+    console.error('Load error', e);
+  }
+}
+
+async function saveToFirebase() {
+  if (!window._firestore) return;
+  const { db, doc, setDoc } = window._firestore;
+  setSyncStatus('saving');
+  try {
+    const ref = doc(db, 'tracker', STORAGE_KEY);
+    await setDoc(ref, state);
+    setSyncStatus('synced');
+  } catch(e) {
+    setSyncStatus('error');
+    console.error('Save error', e);
+  }
+}
+
+function subscribeToFirebase() {
+  if (!window._firestore) return;
+  const { db, doc, onSnapshot } = window._firestore;
+  const ref = doc(db, 'tracker', STORAGE_KEY);
+  if (unsubscribe) unsubscribe();
+  unsubscribe = onSnapshot(ref, (snap) => {
+    if (snap.exists()) {
+      const incoming = snap.data();
+      state = Object.assign(state, incoming);
+      refreshCurrentView();
+    }
+  });
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(saveToFirebase, 1200);
+}
+
+function forceSave() { saveToFirebase(); }
+
+function setSyncStatus(s) {
+  const pill = document.getElementById('syncPill');
+  if (!pill) return;
+  pill.className = 'pill pill-sync' + (s !== 'synced' ? ' ' + s : '');
+  pill.textContent = s === 'synced' ? '● Synced' : s === 'saving' ? '⟳ Saving…' : '✕ Error';
+}
+
+// ══════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════
+function todayKey() { return toDateKey(new Date()); }
+function toDateKey(d) { return d.toISOString().slice(0,10); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+function istNow() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+  return ist;
+}
+function istTimeStr() {
+  const d = istNow();
+  return d.toTimeString().slice(0,5);
+}
+function formatDate(k) {
+  if(!k) return '—';
+  const d = new Date(k + 'T00:00:00');
+  return d.toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+}
+
+function hashPw(pw) {
+  // Simple hash for demo — in production use bcrypt server-side
+  let h = 0;
+  for (let i = 0; i < pw.length; i++) { h = ((h << 5) - h) + pw.charCodeAt(i); h |= 0; }
+  return 'h' + Math.abs(h).toString(16) + pw.length;
+}
+
+function showToast(msg, type='success') {
+  const tc = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<span>${msg}</span>`;
+  tc.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function isHolidayOrLeave(dateKey) {
+  return state.holidays.some(h => h.date === dateKey);
+}
+
+function isLeadershipRole() { return currentUser && currentUser.role === 'Leadership'; }
+
+function addActivity(msg) {
+  if (!state.activityLog) state.activityLog = [];
+  state.activityLog.unshift({ msg, user: currentUser?.name || '—', time: new Date().toISOString() });
+  if (state.activityLog.length > 200) state.activityLog = state.activityLog.slice(0,200);
+}
+
+// ══════════════════════════════════════════════
+// LOGIN / AUTH
+// ══════════════════════════════════════════════
+function initLogin() {
+  // Populate user select
+  const sel = document.getElementById('loginUserSelect');
+  sel.innerHTML = '<option value="">— Choose your name —</option>';
+  (state.members || []).forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.name; o.textContent = m.name + ' (' + m.role + ')';
+    sel.appendChild(o);
+  });
+  sel.addEventListener('change', () => {
+    const name = sel.value;
+    if (!name) return;
+    const hasPw = state.passwords && state.passwords[name];
+    const notice = document.getElementById('firstLoginNotice');
+    const confirmField = document.getElementById('loginConfirmField');
+    const pwLabel = document.getElementById('loginPasswordLabel');
+    if (!hasPw) {
+      notice.style.display = 'block';
+      confirmField.style.display = 'block';
+      pwLabel.textContent = 'Set New Password';
+    } else {
+      notice.style.display = 'none';
+      confirmField.style.display = 'none';
+      pwLabel.textContent = 'Password';
+    }
+  });
+}
+
+function doLogin() {
+  const name = document.getElementById('loginUserSelect').value;
+  const pw = document.getElementById('loginPassword').value;
+  const confirm = document.getElementById('loginConfirm').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+
+  if (!name) { showLoginError('Please select your name.'); return; }
+  if (!pw) { showLoginError('Please enter a password.'); return; }
+
+  const member = (state.members || []).find(m => m.name === name);
+  if (!member) { showLoginError('Member not found.'); return; }
+
+  const hasPw = state.passwords && state.passwords[name];
+  if (!hasPw) {
+    // First login — set password
+    if (pw.length < 4) { showLoginError('Password must be at least 4 characters.'); return; }
+    if (pw !== confirm) { showLoginError('Passwords do not match.'); return; }
+    if (!state.passwords) state.passwords = {};
+    state.passwords[name] = hashPw(pw);
+    addActivity(`${name} set their password on first login`);
+    scheduleSave();
+    showToast('Password set! Welcome, ' + name + '.', 'success');
+  } else {
+    if (state.passwords[name] !== hashPw(pw)) {
+      showLoginError('Incorrect password. Please try again.');
+      return;
+    }
+  }
+
+  currentUser = member;
+  sessionStorage.setItem('trackerUser', JSON.stringify(member));
+  document.getElementById('loginScreen').style.display = 'none';
+  launchApp();
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('loginError');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function doLogout() {
+  currentUser = null;
+  sessionStorage.removeItem('trackerUser');
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  document.getElementById('appShell').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'block';
+  initLogin();
+}
+
+// ══════════════════════════════════════════════
+// APP LAUNCH
+// ══════════════════════════════════════════════
+function launchApp() {
+  document.getElementById('appShell').style.display = 'block';
+  buildTabs();
+  buildHeaderUser();
+  updateClock();
+  setInterval(updateClock, 30000);
+  setDefaultDates();
+  subscribeToFirebase();
+  switchTab('dashboard');
+}
+
+function buildHeaderUser() {
+  document.getElementById('headerUserPill').textContent = '👤 ' + currentUser.name + ' · ' + currentUser.role;
+  const adminArea = document.getElementById('headerAdminArea');
+  adminArea.innerHTML = '';
+  if (isLeadershipRole()) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary btn-sm';
+    btn.textContent = '📧 Email Report';
+    btn.onclick = openEmailReport;
+    adminArea.appendChild(btn);
+  }
+  document.getElementById('headerQuickLogBtn').onclick = openQuickLogModal;
+}
+
+function updateClock() {
+  const d = istNow();
+  document.getElementById('headerDate').textContent = formatDate(toDateKey(d));
+  document.getElementById('headerISTTime').textContent = 'IST ' + d.toTimeString().slice(0,5);
+  checkLeaveBanner();
+}
+
+function setDefaultDates() {
+  const t = todayKey();
+  ['dashDate','scheduleDate','volumeDate','leadershipDate','emailReportDate'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = t;
+  });
+}
+
+function buildTabs() {
+  const tabs = [
+    { id:'dashboard', label:'Dashboard', icon:'🏠' },
+    { id:'schedule', label:'My Schedule', icon:'📋' },
+    { id:'volume', label:'Volume', icon:'📊' },
+  ];
+  if (isLeadershipRole()) {
+    tabs.push({ id:'leadership', label:'Leadership', icon:'🎯' });
+    tabs.push({ id:'analytics', label:'Analytics', icon:'📈' });
+    tabs.push({ id:'team', label:'Manage Team', icon:'👥' });
+    tabs.push({ id:'holidays', label:'Holidays', icon:'🗓️' });
+  }
+  tabs.push({ id:'activity', label:'Activity Feed', icon:'📝' });
+
+  const nav = document.getElementById('mainTabs');
+  nav.innerHTML = '';
+  tabs.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'tab'; btn.dataset.tab = t.id;
+    btn.innerHTML = `<span>${t.icon}</span><span>${t.label}</span>`;
+    btn.onclick = () => switchTab(t.id);
+    nav.appendChild(btn);
+  });
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === id));
+  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'sec-' + id));
+  const renders = {
+    dashboard: renderDashboard,
+    schedule: renderSchedule,
+    volume: renderVolume,
+    leadership: renderLeadership,
+    analytics: renderAnalytics,
+    team: renderTeam,
+    holidays: renderHolidays,
+    activity: renderActivity
+  };
+  if (renders[id]) renders[id]();
+}
+
+function refreshCurrentView() {
+  const active = document.querySelector('.tab.active');
+  if (active) switchTab(active.dataset.tab);
+}
+
+function checkLeaveBanner() {
+  const banner = document.getElementById('leaveBanner');
+  const t = todayKey();
+  const h = state.holidays?.find(x => x.date === t);
+  if (h) {
+    banner.style.display = 'flex';
+    document.getElementById('leaveBannerText').textContent = `Today is marked as: ${h.desc || h.type} — ${formatDate(t)}`;
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════
+function renderDashboard() {
+  const dateKey = document.getElementById('dashDate').value || todayKey();
+  document.getElementById('dashSubtitle').textContent = 'Overview for ' + formatDate(dateKey);
+
+  const tasks = (state.tasks?.[dateKey] || []).filter(t => {
+    if (isLeadershipRole()) return true;
+    return t.responsible === currentUser.name;
+  });
+
+  const total = tasks.length;
+  const done = tasks.filter(t => t.status === 'done').length;
+  const pending = tasks.filter(t => !t.status || t.status === 'pending').length;
+  const partial = tasks.filter(t => t.status === 'partial').length;
+  const slaRisk = tasks.filter(t => {
+    if (!t.endTime || t.status === 'done') return false;
+    const now = istTimeStr();
+    return now > t.endTime;
+  }).length;
+
+  document.getElementById('dashStats').innerHTML = `
+    <div class="stat"><div class="stat-label">Total Tasks</div><div class="stat-value">${total}</div></div>
+    <div class="stat completed"><div class="stat-label">Completed</div><div class="stat-value" style="color:var(--success)">${done}</div></div>
+    <div class="stat pending"><div class="stat-label">Pending</div><div class="stat-value" style="color:var(--warning)">${pending}</div></div>
+    <div class="stat"><div class="stat-label">Partial</div><div class="stat-value" style="color:var(--primary)">${partial}</div></div>
+    <div class="stat risk"><div class="stat-label">SLA Risk</div><div class="stat-value" style="color:var(--danger)">${slaRisk}</div></div>
+    <div class="stat"><div class="stat-label">Completion %</div><div class="stat-value">${total ? Math.round(done/total*100) : 0}%</div></div>
+  `;
+
+  const grid = document.getElementById('quickNavGrid');
+  grid.innerHTML = `
+    <button class="quicknav-card" onclick="switchTab('schedule')">
+      <div class="quicknav-icon">📋</div>
+      <div><div class="quicknav-label">My Schedule</div><div class="quicknav-sub">${pending} pending tasks</div></div>
+    </button>
+    <button class="quicknav-card" onclick="switchTab('volume')">
+      <div class="quicknav-icon">📊</div>
+      <div><div class="quicknav-label">Volume Tracker</div><div class="quicknav-sub">${(state.volume?.[dateKey]||[]).length} items logged</div></div>
+    </button>
+    <button class="quicknav-card" onclick="openQuickLogModal()">
+      <div class="quicknav-icon">⚡</div>
+      <div><div class="quicknav-label">Quick Log</div><div class="quicknav-sub">Update task status fast</div></div>
+    </button>
+    ${isLeadershipRole() ? `
+    <button class="quicknav-card" onclick="switchTab('analytics')">
+      <div class="quicknav-icon">📈</div>
+      <div><div class="quicknav-label">Analytics</div><div class="quicknav-sub">Team performance</div></div>
+    </button>
+    <button class="quicknav-card" onclick="switchTab('team')">
+      <div class="quicknav-icon">👥</div>
+      <div><div class="quicknav-label">Manage Team</div><div class="quicknav-sub">${(state.members||[]).length} members</div></div>
+    </button>` : ''}
+    <button class="quicknav-card" onclick="switchTab('activity')">
+      <div class="quicknav-icon">📝</div>
+      <div><div class="quicknav-label">Activity Feed</div><div class="quicknav-sub">${(state.activityLog||[]).length} recent actions</div></div>
+    </button>
+  `;
+}
+
+// ══════════════════════════════════════════════
+// SCHEDULE
+// ══════════════════════════════════════════════
+const COMPANIES = ['TSL','SIRF','SIAS','Argomm'];
+const DEPTS = ['AP','AR','GL','Other'];
+
+function renderSchedule() {
+  const dateKey = document.getElementById('scheduleDate').value || todayKey();
+  document.getElementById('scheduleSubtitle').textContent = formatDate(dateKey);
+
+  // Company subtabs
+  const subtabs = document.getElementById('scheduleSubtabs');
+  subtabs.innerHTML = '';
+  ['All',...COMPANIES].forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'subtab' + (btn._active || c === 'All' ? '' : '');
+    btn.textContent = c; btn.dataset.company = c;
+    btn.onclick = () => {
+      subtabs.querySelectorAll('.subtab').forEach(x => x.classList.remove('active'));
+      btn.classList.add('active');
+      renderScheduleTable();
+    };
+    subtabs.appendChild(btn);
+  });
+  subtabs.querySelector('.subtab').classList.add('active');
+
+  // Populate filters
+  const fc = document.getElementById('scheduleFilterCompany');
+  fc.innerHTML = '<option value="">All Companies</option>';
+  COMPANIES.forEach(c => fc.innerHTML += `<option>${c}</option>`);
+  const fd = document.getElementById('scheduleFilterDept');
+  fd.innerHTML = '<option value="">All Depts</option>';
+  DEPTS.forEach(d => fd.innerHTML += `<option>${d}</option>`);
+
+  renderScheduleTable();
+}
+
+function getScheduleDateKey() { return document.getElementById('scheduleDate').value || todayKey(); }
+function getActiveCompanySubtab() {
+  const active = document.querySelector('#scheduleSubtabs .subtab.active');
+  return active ? active.dataset.company : 'All';
+}
+
+function renderScheduleTable() {
+  const dateKey = getScheduleDateKey();
+  let tasks = (state.tasks?.[dateKey] || []);
+
+  // Filter by user if Process role
+  if (!isLeadershipRole()) tasks = tasks.filter(t => t.responsible === currentUser.name);
+
+  // Company subtab filter
+  const company = getActiveCompanySubtab();
+  if (company && company !== 'All') tasks = tasks.filter(t => t.company === company);
+
+  // Search
+  const search = document.getElementById('scheduleSearch').value.toLowerCase();
+  if (search) tasks = tasks.filter(t => (t.name+t.company+t.responsible).toLowerCase().includes(search));
+
+  const fc = document.getElementById('scheduleFilterCompany').value;
+  if (fc) tasks = tasks.filter(t => t.company === fc);
+  const fd = document.getElementById('scheduleFilterDept').value;
+  if (fd) tasks = tasks.filter(t => t.dept === fd);
+
+  const now = istTimeStr();
+  const thead = document.querySelector('#scheduleTable thead');
+  const tbody = document.querySelector('#scheduleTable tbody');
+
+  thead.innerHTML = `<tr>
+    <th>#</th><th>Task</th><th>Company</th><th>Dept</th>
+    ${isLeadershipRole() ? '<th>Responsible</th>' : ''}
+    <th>Type</th><th>Start</th><th>Target SLA</th><th>Volume</th><th>Status</th><th>Actions</th>
+  </tr>`;
+
+  if (!tasks.length) { tbody.innerHTML = `<tr><td colspan="11" class="empty-row">No tasks for this date.</td></tr>`; return; }
+
+  tbody.innerHTML = '';
+  tasks.forEach((t, i) => {
+    const slaClass = !t.endTime || t.status === 'done' ? '' : now > t.endTime ? 'sla-crossed' : now >= (subtractMins(t.endTime,30)) ? 'sla-amber' : '';
+    const slaBadge = slaClass === 'sla-crossed' ? '<span class="sla-remark-badge crossed">SLA Crossed</span>' : slaClass === 'sla-amber' ? '<span class="sla-remark-badge amber">SLA Soon</span>' : '';
+    const statusColor = t.status === 'done' ? 'var(--success)' : t.status === 'partial' ? 'var(--warning)' : 'var(--text-muted)';
+    const statusLabel = t.status === 'done' ? '✓ Done' : t.status === 'partial' ? '◑ Partial' : '○ Pending';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td><strong>${t.name}</strong>${t.type==='daily'?'<span class="badge badge-daily">Daily</span>':''} ${t.type==='ageing'?'<span class="badge badge-ageing">Ageing</span>':''} ${t.carryForward?'<span class="badge" style="background:#e0e7ff;color:#4338ca">CF</span>':''}</td>
+      <td>${t.company||'—'}</td><td>${t.dept||'—'}</td>
+      ${isLeadershipRole() ? `<td>${t.responsible||'—'}</td>` : ''}
+      <td>${t.type||'—'}</td>
+      <td>${t.startTime||'—'}</td>
+      <td><span class="target-cell ${slaClass}">${t.endTime||'—'}${slaBadge}</span></td>
+      <td>${t.volume||'—'}</td>
+      <td><span style="font-weight:700;color:${statusColor}">${statusLabel}</span></td>
+      <td>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${t.status !== 'done' ? `<button class="action-btn" onclick="markDone('${dateKey}','${t.id}')">✓ Done</button>` : ''}
+          ${t.status !== 'partial' && t.status !== 'done' ? `<button class="action-btn partial" onclick="markPartial('${dateKey}','${t.id}')">◑ Partial</button>` : ''}
+          <button class="action-btn" style="background:var(--info)" onclick="editTask('${dateKey}','${t.id}')">✎ Edit</button>
+          <button class="action-btn" style="background:var(--danger)" onclick="deleteTask('${dateKey}','${t.id}')">✕</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function subtractMins(timeStr, mins) {
+  if (!timeStr) return '00:00';
+  const [h,m] = timeStr.split(':').map(Number);
+  const total = h*60+m-mins;
+  return String(Math.floor(total/60)).padStart(2,'0') + ':' + String(total%60).padStart(2,'0');
+}
+
+function openAddTaskModal() {
+  editingTaskId = null;
+  document.getElementById('addTaskModalTitle').textContent = 'Add Task';
+  document.getElementById('taskName').value = '';
+  document.getElementById('taskStart').value = '';
+  document.getElementById('taskEnd').value = '';
+  document.getElementById('taskVolume').value = '';
+  document.getElementById('taskRemarks').value = '';
+  document.getElementById('taskCarryForward').checked = false;
+  populateResponsibleSelect('taskResponsible');
+  openModal('addTaskModal');
+}
+
+function editTask(dateKey, taskId) {
+  const tasks = state.tasks?.[dateKey] || [];
+  const t = tasks.find(x => x.id === taskId);
+  if (!t) return;
+  editingTaskId = taskId;
+  document.getElementById('addTaskModalTitle').textContent = 'Edit Task';
+  document.getElementById('taskName').value = t.name || '';
+  document.getElementById('taskCompany').value = t.company || 'TSL';
+  document.getElementById('taskDept').value = t.dept || 'AP';
+  populateResponsibleSelect('taskResponsible', t.responsible);
+  document.getElementById('taskType').value = t.type || 'daily';
+  document.getElementById('taskStart').value = t.startTime || '';
+  document.getElementById('taskEnd').value = t.endTime || '';
+  document.getElementById('taskVolume').value = t.volume || '';
+  document.getElementById('taskRemarks').value = t.remarks || '';
+  document.getElementById('taskCarryForward').checked = !!t.carryForward;
+  document.getElementById('scheduleDate').value; // keep date
+  openModal('addTaskModal');
+}
+
+function saveTask() {
+  const name = document.getElementById('taskName').value.trim();
+  if (!name) { showToast('Task name is required', 'error'); return; }
+  const dateKey = document.getElementById('scheduleDate').value || todayKey();
+  if (!state.tasks) state.tasks = {};
+  if (!state.tasks[dateKey]) state.tasks[dateKey] = [];
+
+  const taskData = {
+    id: editingTaskId || uid(),
+    name,
+    company: document.getElementById('taskCompany').value,
+    dept: document.getElementById('taskDept').value,
+    responsible: document.getElementById('taskResponsible').value,
+    type: document.getElementById('taskType').value,
+    startTime: document.getElementById('taskStart').value,
+    endTime: document.getElementById('taskEnd').value,
+    volume: document.getElementById('taskVolume').value,
+    remarks: document.getElementById('taskRemarks').value,
+    carryForward: document.getElementById('taskCarryForward').checked,
+    status: 'pending',
+    createdBy: currentUser.name,
+    createdAt: new Date().toISOString()
+  };
+
+  if (editingTaskId) {
+    const idx = state.tasks[dateKey].findIndex(t => t.id === editingTaskId);
+    if (idx >= 0) { taskData.status = state.tasks[dateKey][idx].status; state.tasks[dateKey][idx] = taskData; }
+  } else {
+    state.tasks[dateKey].push(taskData);
+    // Carry forward to tomorrow
+    if (taskData.carryForward) {
+      const tomorrow = toDateKey(new Date(new Date(dateKey).getTime() + 86400000));
+      if (!state.tasks[tomorrow]) state.tasks[tomorrow] = [];
+      state.tasks[tomorrow].push({ ...taskData, id: uid(), status: 'pending', createdAt: new Date().toISOString() });
+    }
+  }
+
+  addActivity(`${currentUser.name} ${editingTaskId?'edited':'added'} task "${name}" for ${dateKey}`);
+  scheduleSave();
+  closeModal('addTaskModal');
+  renderScheduleTable();
+  showToast(editingTaskId ? 'Task updated' : 'Task added');
+}
+
+function deleteTask(dateKey, taskId) {
+  if (!confirm('Delete this task?')) return;
+  state.tasks[dateKey] = (state.tasks[dateKey] || []).filter(t => t.id !== taskId);
+  addActivity(`${currentUser.name} deleted a task`);
+  scheduleSave(); renderScheduleTable();
+  showToast('Task deleted');
+}
+
+function markDone(dateKey, taskId) {
+  const t = (state.tasks[dateKey] || []).find(x => x.id === taskId);
+  if (t) { t.status = 'done'; t.completedAt = new Date().toISOString(); t.completedBy = currentUser.name; }
+  addActivity(`${currentUser.name} marked "${t?.name}" as Done`);
+  scheduleSave(); renderScheduleTable();
+  showToast('Marked as Done ✓');
+}
+
+function markPartial(dateKey, taskId) {
+  const t = (state.tasks[dateKey] || []).find(x => x.id === taskId);
+  if (t) { t.status = 'partial'; }
+  addActivity(`${currentUser.name} marked "${t?.name}" as Partial`);
+  scheduleSave(); renderScheduleTable();
+  showToast('Marked as Partial');
+}
+
+function populateResponsibleSelect(selectId, selected) {
+  const sel = document.getElementById(selectId);
+  sel.innerHTML = '';
+  (state.members || []).forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.name; o.textContent = m.name;
+    if (selected && m.name === selected) o.selected = true;
+    sel.appendChild(o);
+  });
+  if (!selected) {
+    // Default to current user
+    [...sel.options].forEach(o => { if (o.value === currentUser.name) o.selected = true; });
+  }
+}
+
+// ══════════════════════════════════════════════
+// VOLUME
+// ══════════════════════════════════════════════
+function renderVolume() {
+  const dateKey = document.getElementById('volumeDate').value || todayKey();
+  const subtabs = document.getElementById('volumeSubtabs');
+  subtabs.innerHTML = '';
+  ['All',...COMPANIES].forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'subtab'; btn.textContent = c; btn.dataset.company = c;
+    btn.onclick = () => { subtabs.querySelectorAll('.subtab').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); renderVolumeTable(); };
+    subtabs.appendChild(btn);
+  });
+  subtabs.querySelector('.subtab').classList.add('active');
+  renderVolumeTable();
+}
+
+function renderVolumeTable() {
+  const dateKey = document.getElementById('volumeDate').value || todayKey();
+  let items = state.volume?.[dateKey] || [];
+  const company = document.querySelector('#volumeSubtabs .subtab.active')?.dataset.company;
+  if (company && company !== 'All') items = items.filter(x => x.company === company);
+
+  const thead = document.querySelector('#volumeTable thead');
+  const tbody = document.querySelector('#volumeTable tbody');
+  thead.innerHTML = `<tr><th>#</th><th>Description</th><th>Company</th><th>Dept</th><th>Opening</th><th>Received</th><th>Total</th><th>Processed</th><th>Pending</th><th>Remarks</th><th>Actions</th></tr>`;
+
+  if (!items.length) { tbody.innerHTML = `<tr><td colspan="11" class="empty-row">No volume items for this date.</td></tr>`; return; }
+
+  let totOpening=0,totReceived=0,totProcessed=0,totPending=0;
+  tbody.innerHTML = '';
+  items.forEach((it,i) => {
+    const total = (Number(it.opening)||0) + (Number(it.received)||0);
+    const pending = total - (Number(it.processed)||0);
+    totOpening += Number(it.opening)||0;
+    totReceived += Number(it.received)||0;
+    totProcessed += Number(it.processed)||0;
+    totPending += pending;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${i+1}</td><td><strong>${it.desc}</strong></td><td>${it.company}</td><td>${it.dept}</td>
+      <td>${it.opening||0}</td><td>${it.received||0}</td><td><strong>${total}</strong></td>
+      <td style="color:var(--success);font-weight:700">${it.processed||0}</td>
+      <td style="color:${pending>0?'var(--warning)':'var(--success)'};font-weight:700">${pending}</td>
+      <td>${it.remarks||'—'}</td>
+      <td>
+        <button class="action-btn" style="background:var(--danger)" onclick="deleteVolumeItem('${dateKey}','${it.id}')">✕</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const totalRow = document.createElement('tr');
+  totalRow.className = 'total-row';
+  totalRow.innerHTML = `<td colspan="4"><strong>TOTAL</strong></td><td>${totOpening}</td><td>${totReceived}</td><td>${totOpening+totReceived}</td><td>${totProcessed}</td><td>${totPending}</td><td colspan="2"></td>`;
+  tbody.appendChild(totalRow);
+}
+
+function openAddVolumeModal() {
+  document.getElementById('volDesc').value = '';
+  document.getElementById('volOpening').value = '';
+  document.getElementById('volReceived').value = '';
+  document.getElementById('volProcessed').value = '';
+  document.getElementById('volRemarks').value = '';
+  openModal('addVolumeModal');
+}
+
+function saveVolumeItem() {
+  const desc = document.getElementById('volDesc').value.trim();
+  if (!desc) { showToast('Description required', 'error'); return; }
+  const dateKey = document.getElementById('volumeDate').value || todayKey();
+  if (!state.volume) state.volume = {};
+  if (!state.volume[dateKey]) state.volume[dateKey] = [];
+  state.volume[dateKey].push({
+    id: uid(), desc,
+    company: document.getElementById('volCompany').value,
+    dept: document.getElementById('volDept').value,
+    opening: document.getElementById('volOpening').value,
+    received: document.getElementById('volReceived').value,
+    processed: document.getElementById('volProcessed').value,
+    remarks: document.getElementById('volRemarks').value,
+    addedBy: currentUser.name, addedAt: new Date().toISOString()
+  });
+  addActivity(`${currentUser.name} added volume item "${desc}"`);
+  scheduleSave(); closeModal('addVolumeModal'); renderVolumeTable();
+  showToast('Volume item added');
+}
+
+function deleteVolumeItem(dateKey, id) {
+  if (!confirm('Delete this item?')) return;
+  state.volume[dateKey] = (state.volume[dateKey]||[]).filter(x => x.id !== id);
+  scheduleSave(); renderVolumeTable();
+  showToast('Deleted');
+}
+
+// ══════════════════════════════════════════════
+// LEADERSHIP
+// ══════════════════════════════════════════════
+function renderLeadership() {
+  const dateKey = document.getElementById('leadershipDate').value || todayKey();
+  const items = state.leadership?.[dateKey] || [];
+  const thead = document.querySelector('#leadershipTable thead');
+  const tbody = document.querySelector('#leadershipTable tbody');
+  thead.innerHTML = `<tr><th>#</th><th>Activity</th><th>Category</th><th>Duration (mins)</th><th>Notes</th><th>Added By</th><th>Actions</th></tr>`;
+  if (!items.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-row">No leadership activities for this date.</td></tr>`; return; }
+  tbody.innerHTML = '';
+  items.forEach((it,i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td><strong>${it.activity}</strong></td><td>${it.category}</td><td>${it.duration||'—'}</td><td>${it.notes||'—'}</td><td>${it.addedBy||'—'}</td>
+    <td><button class="action-btn" style="background:var(--danger)" onclick="deleteLeadershipItem('${dateKey}','${it.id}')">✕</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function openAddLeadershipModal() {
+  document.getElementById('ldActivity').value = '';
+  document.getElementById('ldDuration').value = '';
+  document.getElementById('ldNotes').value = '';
+  openModal('addLeadershipModal');
+}
+
+function saveLeadershipActivity() {
+  const act = document.getElementById('ldActivity').value.trim();
+  if (!act) { showToast('Activity required', 'error'); return; }
+  const dateKey = document.getElementById('leadershipDate').value || todayKey();
+  if (!state.leadership) state.leadership = {};
+  if (!state.leadership[dateKey]) state.leadership[dateKey] = [];
+  state.leadership[dateKey].push({
+    id: uid(), activity: act,
+    category: document.getElementById('ldCategory').value,
+    duration: document.getElementById('ldDuration').value,
+    notes: document.getElementById('ldNotes').value,
+    addedBy: currentUser.name, addedAt: new Date().toISOString()
+  });
+  addActivity(`${currentUser.name} logged leadership activity: "${act}"`);
+  scheduleSave(); closeModal('addLeadershipModal'); renderLeadership();
+  showToast('Activity logged');
+}
+
+function deleteLeadershipItem(dateKey, id) {
+  if (!confirm('Delete?')) return;
+  state.leadership[dateKey] = (state.leadership[dateKey]||[]).filter(x => x.id !== id);
+  scheduleSave(); renderLeadership();
+}
+
+// ══════════════════════════════════════════════
+// ANALYTICS
+// ══════════════════════════════════════════════
+let analyticsCharts = {};
+function renderAnalytics() {
+  const days = parseInt(document.getElementById('analyticsRange').value) || 30;
+  const dates = [];
+  for (let i = days-1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    dates.push(toDateKey(d));
+  }
+
+  // Destroy old charts
+  Object.values(analyticsCharts).forEach(c => { try { c.destroy(); } catch(e){} });
+  analyticsCharts = {};
+
+  const grid = document.getElementById('analyticsGrid');
+  grid.innerHTML = `
+    <div class="chart-card"><div class="chart-title">Daily Task Completion</div><canvas id="chartCompletion"></canvas></div>
+    <div class="chart-card"><div class="chart-title">Tasks by Company</div><canvas id="chartCompany"></canvas></div>
+    <div class="chart-card"><div class="chart-title">Volume Processed vs Pending</div><canvas id="chartVolume"></canvas></div>
+    <div class="chart-card"><div class="chart-title">SLA Performance</div><canvas id="chartSLA"></canvas></div>
+    <div class="chart-card"><div class="chart-title">Team Member Completion</div><canvas id="chartMember"></canvas></div>
+    <div class="chart-card"><div class="chart-title">Task Types Distribution</div><canvas id="chartTypes"></canvas></div>
+  `;
+
+  const labels = dates.map(d => d.slice(5));
+  const completionData = dates.map(d => {
+    const tasks = state.tasks?.[d] || [];
+    return tasks.length ? Math.round(tasks.filter(t=>t.status==='done').length/tasks.length*100) : 0;
+  });
+
+  analyticsCharts.completion = new Chart(document.getElementById('chartCompletion'), {
+    type:'line', data:{ labels, datasets:[{ label:'Completion %', data:completionData, borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,.1)', fill:true, tension:.4 }]},
+    options:{ responsive:true, plugins:{ legend:{ display:false }}, scales:{ y:{ max:100, ticks:{ callback: v=>v+'%' }}}}
+  });
+
+  // By company
+  const companyTotals = {};
+  COMPANIES.forEach(c => companyTotals[c] = 0);
+  dates.forEach(d => { (state.tasks?.[d]||[]).forEach(t => { if(t.company) companyTotals[t.company] = (companyTotals[t.company]||0)+1; }); });
+  analyticsCharts.company = new Chart(document.getElementById('chartCompany'), {
+    type:'doughnut', data:{ labels:COMPANIES, datasets:[{ data:COMPANIES.map(c=>companyTotals[c]||0), backgroundColor:['#6366f1','#a855f7','#ec4899','#f59e0b'] }]},
+    options:{ responsive:true }
+  });
+
+  // Volume
+  const volProcessed = dates.map(d => (state.volume?.[d]||[]).reduce((s,x)=>s+(Number(x.processed)||0),0));
+  const volPending = dates.map(d => (state.volume?.[d]||[]).reduce((s,x)=>{ const tot=(Number(x.opening)||0)+(Number(x.received)||0); return s+(tot-(Number(x.processed)||0)); },0));
+  analyticsCharts.volume = new Chart(document.getElementById('chartVolume'), {
+    type:'bar', data:{ labels, datasets:[
+      { label:'Processed', data:volProcessed, backgroundColor:'#10b981' },
+      { label:'Pending', data:volPending, backgroundColor:'#f59e0b' }
+    ]}, options:{ responsive:true, scales:{ x:{ stacked:false }, y:{ stacked:false }}}
+  });
+
+  // SLA
+  const slaOk = dates.map(d => { const t=state.tasks?.[d]||[]; return t.filter(x=>x.status==='done').length; });
+  const slaFail = dates.map(d => { const t=state.tasks?.[d]||[]; return t.filter(x=>x.status!=='done' && x.endTime && x.endTime < istTimeStr()).length; });
+  analyticsCharts.sla = new Chart(document.getElementById('chartSLA'), {
+    type:'bar', data:{ labels, datasets:[
+      { label:'On Time', data:slaOk, backgroundColor:'#10b981' },
+      { label:'SLA Missed', data:slaFail, backgroundColor:'#ef4444' }
+    ]}, options:{ responsive:true }
+  });
+
+  // By member
+  const memberCounts = {};
+  (state.members||[]).forEach(m => memberCounts[m.name] = 0);
+  dates.forEach(d => { (state.tasks?.[d]||[]).filter(t=>t.status==='done').forEach(t=>{ if(t.responsible) memberCounts[t.responsible]=(memberCounts[t.responsible]||0)+1; }); });
+  const memberNames = Object.keys(memberCounts);
+  analyticsCharts.member = new Chart(document.getElementById('chartMember'), {
+    type:'bar', data:{ labels:memberNames, datasets:[{ label:'Tasks Completed', data:memberNames.map(n=>memberCounts[n]), backgroundColor:'#6366f1' }]},
+    options:{ responsive:true, plugins:{ legend:{ display:false }}}
+  });
+
+  // Task types
+  let daily=0,ageing=0;
+  dates.forEach(d => { (state.tasks?.[d]||[]).forEach(t=>{ if(t.type==='daily') daily++; else ageing++; }); });
+  analyticsCharts.types = new Chart(document.getElementById('chartTypes'), {
+    type:'pie', data:{ labels:['Daily','Ageing'], datasets:[{ data:[daily,ageing], backgroundColor:['#10b981','#f59e0b'] }]},
+    options:{ responsive:true }
+  });
+}
+
+// ══════════════════════════════════════════════
+// TEAM
+// ══════════════════════════════════════════════
+function renderTeam() {
+  const thead = document.querySelector('#teamTable thead');
+  const tbody = document.querySelector('#teamTable tbody');
+  thead.innerHTML = `<tr><th>#</th><th>Name</th><th>Role</th><th>Department</th><th>Password Set</th><th>Actions</th></tr>`;
+  const members = state.members || [];
+  if (!members.length) { tbody.innerHTML = `<tr><td colspan="6" class="empty-row">No team members yet.</td></tr>`; return; }
+  tbody.innerHTML = '';
+  members.forEach((m,i) => {
+    const hasPw = !!(state.passwords?.[m.name]);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${i+1}</td><td><strong>${m.name}</strong></td>
+      <td><span class="badge" style="background:${m.role==='Leadership'?'var(--info-bg)':'var(--success-bg)'};color:${m.role==='Leadership'?'#1e40af':'var(--success-text)'}">${m.role}</span></td>
+      <td>${m.dept||'—'}</td>
+      <td>${hasPw?'<span style="color:var(--success)">✓ Set</span>':'<span style="color:var(--warning)">⚠ Pending</span>'}</td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          <button class="action-btn" onclick="resetMemberPassword('${m.name}')">Reset PW</button>
+          <button class="action-btn" style="background:var(--danger)" onclick="deleteMember('${m.name}')">✕ Remove</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function openAddMemberModal() {
+  editingMemberId = null;
+  document.getElementById('addMemberModalTitle').textContent = 'Add Team Member';
+  document.getElementById('memberName').value = '';
+  document.getElementById('memberPassword').value = '';
+  openModal('addMemberModal');
+}
+
+function saveMember() {
+  const name = document.getElementById('memberName').value.trim();
+  if (!name) { showToast('Name required', 'error'); return; }
+  const role = document.getElementById('memberRole').value;
+  const dept = document.getElementById('memberDept').value;
+  const pw = document.getElementById('memberPassword').value;
+
+  if (!state.members) state.members = [];
+  if (state.members.find(m => m.name === name)) { showToast('Member already exists', 'error'); return; }
+
+  state.members.push({ name, role, dept });
+  if (pw) {
+    if (!state.passwords) state.passwords = {};
+    state.passwords[name] = hashPw(pw);
+  }
+  addActivity(`${currentUser.name} added team member "${name}" (${role})`);
+  scheduleSave(); closeModal('addMemberModal'); renderTeam();
+  showToast('Member added');
+}
+
+function deleteMember(name) {
+  if (!confirm(`Remove ${name} from the team?`)) return;
+  state.members = (state.members||[]).filter(m => m.name !== name);
+  if (state.passwords) delete state.passwords[name];
+  addActivity(`${currentUser.name} removed team member "${name}"`);
+  scheduleSave(); renderTeam();
+  showToast('Member removed');
+}
+
+function resetMemberPassword(name) {
+  if (!confirm(`Reset password for ${name}? They will need to set a new one on next login.`)) return;
+  if (state.passwords) delete state.passwords[name];
+  addActivity(`${currentUser.name} reset password for "${name}"`);
+  scheduleSave(); renderTeam();
+  showToast('Password reset — ' + name + ' will set new password on next login');
+}
+
+// ══════════════════════════════════════════════
+// HOLIDAYS
+// ══════════════════════════════════════════════
+function renderHolidays() {
+  const thead = document.querySelector('#holidaysTable thead');
+  const tbody = document.querySelector('#holidaysTable tbody');
+  thead.innerHTML = `<tr><th>#</th><th>Date</th><th>Day</th><th>Type</th><th>Description</th><th>Actions</th></tr>`;
+  const holidays = (state.holidays||[]).sort((a,b)=>a.date.localeCompare(b.date));
+  if (!holidays.length) { tbody.innerHTML = `<tr><td colspan="6" class="empty-row">No holidays added.</td></tr>`; return; }
+  tbody.innerHTML = '';
+  holidays.forEach((h,i) => {
+    const d = new Date(h.date+'T00:00:00');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${i+1}</td><td>${formatDate(h.date)}</td>
+      <td>${d.toLocaleDateString('en-IN',{weekday:'long'})}</td>
+      <td><span class="badge ${h.type==='holiday'?'badge-daily':'badge-ageing'}">${h.type}</span></td>
+      <td>${h.desc||'—'}</td>
+      <td><button class="action-btn" style="background:var(--danger)" onclick="deleteHoliday('${h.date}')">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function openAddHolidayModal() {
+  document.getElementById('holidayDate').value = todayKey();
+  document.getElementById('holidayDesc').value = '';
+  openModal('addHolidayModal');
+}
+
+function saveHoliday() {
+  const date = document.getElementById('holidayDate').value;
+  const desc = document.getElementById('holidayDesc').value.trim();
+  if (!date) { showToast('Date required','error'); return; }
+  if (!state.holidays) state.holidays = [];
+  if (state.holidays.find(h=>h.date===date)) { showToast('Holiday already exists for this date','error'); return; }
+  state.holidays.push({ date, type: document.getElementById('holidayType').value, desc });
+  addActivity(`${currentUser.name} added holiday "${desc}" on ${date}`);
+  scheduleSave(); closeModal('addHolidayModal'); renderHolidays();
+  showToast('Holiday added');
+}
+
+function deleteHoliday(date) {
+  state.holidays = (state.holidays||[]).filter(h=>h.date!==date);
+  scheduleSave(); renderHolidays();
+  showToast('Holiday removed');
+}
+
+// ══════════════════════════════════════════════
+// ACTIVITY FEED
+// ══════════════════════════════════════════════
+function renderActivity() {
+  const feed = document.getElementById('activityFeed');
+  const logs = state.activityLog || [];
+  if (!logs.length) { feed.innerHTML = '<div style="color:var(--text-faint);text-align:center;padding:32px;">No activity yet.</div>'; return; }
+  feed.innerHTML = '';
+  logs.slice(0,100).forEach(log => {
+    const div = document.createElement('div');
+    div.className = 'activity-item';
+    const time = new Date(log.time).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    div.innerHTML = `<div class="activity-dot"></div><div class="activity-content"><div>${log.msg}</div><div class="activity-meta">${log.user} · ${time} IST</div></div>`;
+    feed.appendChild(div);
+  });
+}
+
+// ══════════════════════════════════════════════
+// QUICK LOG MODAL
+// ══════════════════════════════════════════════
+function openQuickLogModal() {
+  const dateKey = todayKey();
+  const tasks = (state.tasks?.[dateKey]||[]).filter(t => {
+    if (isLeadershipRole()) return true;
+    return t.responsible === currentUser.name;
+  }).filter(t => t.status !== 'done');
+
+  const sel = document.getElementById('qlTask');
+  sel.innerHTML = tasks.length ? '' : '<option value="">No pending tasks</option>';
+  tasks.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.id; o.textContent = `${t.name} (${t.company} - ${t.dept})`;
+    sel.appendChild(o);
+  });
+  document.getElementById('qlActual').value = istTimeStr();
+  openModal('quickLogModal');
+}
+
+function saveQuickLog() {
+  const taskId = document.getElementById('qlTask').value;
+  const status = document.getElementById('qlStatus').value;
+  const dateKey = todayKey();
+  if (!taskId) { showToast('No task selected', 'error'); return; }
+  const t = (state.tasks[dateKey]||[]).find(x=>x.id===taskId);
+  if (!t) return;
+  t.status = status;
+  t.actualTime = document.getElementById('qlActual').value;
+  t.remarks = document.getElementById('qlRemarks').value || t.remarks;
+  if (status === 'done') { t.completedAt = new Date().toISOString(); t.completedBy = currentUser.name; }
+  addActivity(`${currentUser.name} quick-logged "${t.name}" as ${status}`);
+  scheduleSave(); closeModal('quickLogModal'); refreshCurrentView();
+  showToast('Logged successfully');
+}
+
+// ══════════════════════════════════════════════
+// EXPORT / IMPORT
+// ══════════════════════════════════════════════
+function exportExcel() {
+  const dateKey = document.getElementById('scheduleDate').value || todayKey();
+  const tasks = state.tasks?.[dateKey] || [];
+  const rows = tasks.map((t,i) => ({
+    '#': i+1, Task: t.name, Company: t.company, Dept: t.dept,
+    Responsible: t.responsible, Type: t.type,
+    'Start Time': t.startTime, 'Target SLA': t.endTime,
+    Volume: t.volume, Status: t.status, Remarks: t.remarks
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
+  XLSX.writeFile(wb, `schedule_${dateKey}.xlsx`);
+}
+
+function importExcel() { document.getElementById('excelFileInput').click(); }
+
+function handleExcelImport(evt) {
+  const file = evt.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, {type:'binary'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws);
+    const dateKey = document.getElementById('scheduleDate').value || todayKey();
+    if (!state.tasks) state.tasks = {};
+    if (!state.tasks[dateKey]) state.tasks[dateKey] = [];
+    rows.forEach(r => {
+      state.tasks[dateKey].push({
+        id: uid(), name: r['Task']||r['task']||'Imported Task',
+        company: r['Company']||'TSL', dept: r['Dept']||'AP',
+        responsible: r['Responsible']||currentUser.name,
+        type: r['Type']||'daily', startTime: r['Start Time']||'',
+        endTime: r['Target SLA']||'', volume: r['Volume']||'',
+        remarks: r['Remarks']||'', status:'pending',
+        createdBy: currentUser.name, createdAt: new Date().toISOString()
+      });
+    });
+    addActivity(`${currentUser.name} imported ${rows.length} tasks via Excel`);
+    scheduleSave(); renderScheduleTable();
+    showToast(`${rows.length} tasks imported`);
+  };
+  reader.readAsBinaryString(file);
+  evt.target.value = '';
+}
+
+function exportAuditLog() {
+  const logs = state.activityLog || [];
+  const rows = logs.map(l => ({ Action: l.msg, User: l.user, Time: new Date(l.time).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}) }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Audit Log');
+  XLSX.writeFile(wb, `audit_log_${todayKey()}.xlsx`);
+}
+
+// ══════════════════════════════════════════════
+// EMAIL REPORT
+// ══════════════════════════════════════════════
+function openEmailReport() {
+  document.getElementById('emailReportDate').value = todayKey();
+  generateEmailPreview();
+  openModal('emailReportModal');
+}
+
+function generateEmailPreview() {
+  const dateKey = document.getElementById('emailReportDate').value || todayKey();
+  const tasks = state.tasks?.[dateKey] || [];
+  const done = tasks.filter(t=>t.status==='done').length;
+  const pending = tasks.filter(t=>t.status!=='done').length;
+  const volItems = state.volume?.[dateKey] || [];
+
+  let body = `DAILY SCHEDULE REPORT — ${formatDate(dateKey)}\nDatamatics Global Services\n${'='.repeat(50)}\n\n`;
+  body += `TASK SUMMARY\n${'-'.repeat(30)}\nTotal Tasks: ${tasks.length}\nCompleted: ${done}\nPending/Partial: ${pending}\nCompletion Rate: ${tasks.length ? Math.round(done/tasks.length*100) : 0}%\n\n`;
+
+  if (volItems.length) {
+    body += `VOLUME SUMMARY\n${'-'.repeat(30)}\n`;
+    volItems.forEach(v => {
+      const tot = (Number(v.opening)||0)+(Number(v.received)||0);
+      body += `${v.desc} (${v.company}): Processed ${v.processed||0} / Total ${tot}\n`;
+    });
+    body += '\n';
+  }
+
+  body += `TASK DETAILS\n${'-'.repeat(30)}\n`;
+  tasks.forEach((t,i) => {
+    body += `${i+1}. ${t.name} [${t.company}/${t.dept}] — ${t.status?.toUpperCase()||'PENDING'} — Responsible: ${t.responsible}\n`;
+  });
+
+  document.getElementById('emailPreview').textContent = body;
+}
+
+function sendEmailReport() {
+  const preview = document.getElementById('emailPreview').textContent;
+  navigator.clipboard.writeText(preview).then(() => showToast('Report copied to clipboard!')).catch(()=>{});
+  const to = document.getElementById('emailTo').value;
+  if (to) window.open(`mailto:${to}?subject=Daily Schedule Report — ${document.getElementById('emailReportDate').value}&body=${encodeURIComponent(preview)}`);
+  closeModal('emailReportModal');
+}
+
+// ══════════════════════════════════════════════
+// SEED DEFAULT DATA (first run)
+// ══════════════════════════════════════════════
+function seedDefaultData() {
+  if (state.members && state.members.length > 0) return;
+  state.members = [
+    { name: 'Ravisankar', role: 'Leadership', dept: 'AP' },
+    { name: 'Team Member 1', role: 'Process', dept: 'AP' },
+    { name: 'Team Member 2', role: 'Process', dept: 'AR' },
+    { name: 'Team Member 3', role: 'Process', dept: 'AP' },
+    { name: 'Team Member 4', role: 'Process', dept: 'AR' },
+  ];
+  scheduleSave();
+}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+async function init() {
+  const overlay = document.getElementById('loadingOverlay');
+
+  // Wait for Firebase
+  if (!window._firebaseReady) {
+    await new Promise(r => window.addEventListener('firebaseReady', r, { once:true }));
+  }
+
+  // Load data
+  await loadFromFirebase();
+
+  // Seed if empty
+  seedDefaultData();
+
+  overlay.style.opacity = '0';
+  setTimeout(() => overlay.style.display = 'none', 300);
+
+  // Check session
+  const saved = sessionStorage.getItem('trackerUser');
+  if (saved) {
+    try {
+      const user = JSON.parse(saved);
+      const stillMember = (state.members||[]).find(m=>m.name===user.name);
+      if (stillMember) { currentUser = stillMember; launchApp(); return; }
+    } catch(e){}
+  }
+
+  // Show login
+  initLogin();
+  document.getElementById('loginScreen').style.display = 'block';
+}
+
+init();
+</script>
+</body>
+</html>
