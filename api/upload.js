@@ -26,19 +26,19 @@ module.exports = async function handler(req, res) {
     const body = Buffer.concat(chunks);
     if (!body.length) return res.status(400).json({ error: 'Empty file' });
 
-    // Use @vercel/blob SDK with access: 'private'
+    // Hobby plan only supports access: 'public'
     const blob = await put(filepath, body, {
-      access: 'private',
+      access: 'public',
       addRandomSuffix: false,
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
 
     return res.status(200).json({
-      url:        blob.url,
+      url:         blob.url,
       downloadUrl: blob.downloadUrl,
-      path:       filepath,
-      size:       body.length,
-      uploadedAt: new Date().toISOString(),
+      path:        filepath,
+      size:        body.length,
+      uploadedAt:  new Date().toISOString(),
     });
 
   } catch (e) {
