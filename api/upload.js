@@ -33,14 +33,15 @@ module.exports = async function handler(req, res) {
     if (!body.length) return res.status(400).json({ error: 'Empty file received' });
 
     // Upload to Vercel Blob via REST API
-    const blobResp = await fetch(`https://blob.vercel-storage.com/${filepath}`, {
+    const blobResp = await fetch(`https://blob.vercel-storage.com/${encodeURIComponent(filepath)}`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': req.headers['content-type'] || 'application/octet-stream',
         'x-api-version': '7',
         'x-add-random-suffix': '0',
-        'x-cache-control-max-age': '0',
+        'x-cache-control-max-age': '31536000',
+        'x-allow-overwrite': '1',
       },
       body,
     });
