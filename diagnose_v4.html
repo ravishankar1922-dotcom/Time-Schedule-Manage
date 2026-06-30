@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Timeline Diagnostic</title>
+<style>
+body{font-family:monospace;background:#0f172a;color:#e2e8f0;padding:30px;font-size:13px;line-height:1.8;}
+.box{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:18px;margin-bottom:14px;}
+.ok{color:#34d399;}
+.bad{color:#f87171;}
+.warn{color:#fbbf24;}
+h1{color:#fff;font-size:18px;margin-bottom:20px;}
+table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}
+td,th{padding:6px 8px;border-bottom:1px solid #334155;text-align:left;}
+th{color:#64748b;text-transform:uppercase;font-size:10px;}
+.before{background:rgba(245,158,11,.1);}
+.after{background:rgba(16,185,129,.1);}
+</style></head>
+<body>
+<h1>🕐 Exact Timeline — Every Completion Today, IST</h1>
+<div id="output">Loading...</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyCQpHQb_j0pn2SRUmKR5wUGaf4bYH_3yi0",
+  authDomain:"time-schedule-tracker.firebaseapp.com",
+  projectId:"time-schedule-tracker",
+  storageBucket:"time-schedule-tracker.firebasestorage.app",
+  messagingSenderId:"67296866406",
+  appId:"1:67296866406:web:7a7656b5f5b7ed20ec7da7"
+});
+const db = firebase.firestore();
+
+async function diagnose(){
+  const out = document.getElementById('output');
+  let html = '';
+
+  const tasksSnap = await db.collection('eh_v1').doc('tasks').get();
+  const dailySnap = await db.collection('eh_v1').doc('daily').get();
+  const logsSnap = await db.collection('eh_v1').doc('logs').get();
+
+  const tasks = (tasksSnap.data()||{}).masterTasks || [];
+  const taskById = {};
+  tasks.forEach(t=>taskById[t.id]=t);
+  const dailyStatus = (dailySnap.data()||{}).dailyStatus || {};
+  const logs = (logsSnap.data()||{}).actLog || [];
+
+  // Find today's date key
+  const todayKey = new Date().toISOString().slice(0,10);
+  const todayData = dailyStatus[todayKey] || {};
+
+  html += `<div class="box"><strong>📅 Today's date key: ${todayKey}</strong><br>Total entries in dailyStatus[${todayKey}]: <span class="ok">${Object.keys(todayData).length}</span></div>`;
+
+  // Build full timeline of EVERY completion today, sorted by time, in IST
+  const rows = [];
+  Object.entries(todayData).forEach(([id,st])=>{
+    if(!st.completedAt) return;
+    const utc = new Date(st.completedAt);
+    const istStr = utc.toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true,day:'2-digit',month:'short'});
+    const taskName = taskById[id]?.name || '⚠️ TASK ID NOT FOUND IN MASTER LIST';
+    rows.push({id, time:istStr, sortKey:utc.getTime(), name:taskName, by:st.completedBy||'—', found: !!taskById[id]});
+  });
+  rows.sort((a,b)=>a.sortKey-b.sortKey);
+
+  html += '<div class="box"><strong>📋 Full timeline — every completion today (IST), sorted</strong>';
+  html += '<table><tr><th>Time (IST)</th><th>Task Name</th><th>Completed By</th><th>Task Found?</th></tr>';
+  // Mark the cutoff: 5:00 PM IST today as the reference point user mentioned
+  rows.forEach(r=>{
+    const hour = parseInt(r.time.split(':')[0]);
+    const isPM = r.time.includes('PM');
+    const hour24 = isPM && hour!==12 ? hour+12 : hour;
+    const cls = hour24 < 17 ? 'before' : 'after';
+    html += `<tr class="${cls}"><td>${r.time}</td><td>${r.name}</td><td>${r.by}</td><td class="${r.found?'ok':'bad'}">${r.found?'✓ YES':'✗ ORPHANED'}</td></tr>`;
+  });
+  html += '</table></div>';
+
+  const beforeCount = rows.filter(r=>{const h=parseInt(r.time.split(':')[0]);const pm=r.time.includes('PM');const h24=pm&&h!==12?h+12:h;return h24<17;}).length;
+  const afterCount = rows.length - beforeCount;
+  html += `<div class="box"><strong>📊 Summary</strong><br>Completions BEFORE 5:00 PM IST (highlighted orange above): <span class="${beforeCount>0?'ok':'bad'}">${beforeCount}</span><br>Completions AFTER 5:00 PM IST (highlighted green above): <span class="ok">${afterCount}</span></div>`;
+
+  // Show ALL activity log entries from today for cross-reference
+  const todayLogs = logs.filter(l=>l.time && l.time.startsWith(todayKey));
+  html += `<div class="box"><strong>📝 Activity Log entries for ${todayKey} (all, sorted oldest first)</strong><br>`;
+  todayLogs.sort((a,b)=>new Date(a.time)-new Date(b.time));
+  todayLogs.forEach(l=>{
+    const istStr = new Date(l.time).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',hour12:true});
+    html += `${istStr} — ${l.user}: ${l.msg}<br>`;
+  });
+  if(todayLogs.length===0) html += '<span class="bad">No activity log entries found for today at all</span>';
+  html += '</div>';
+
+  out.innerHTML = html;
+}
+diagnose();
+</script>
+</body></html>
