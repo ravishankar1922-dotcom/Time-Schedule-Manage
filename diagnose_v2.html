@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Deep Diagnose</title>
+<style>
+body{font-family:monospace;background:#0f172a;color:#e2e8f0;padding:30px;font-size:13px;line-height:1.8;}
+.box{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:18px;margin-bottom:14px;}
+.ok{color:#34d399;}
+.bad{color:#f87171;}
+.warn{color:#fbbf24;}
+h1{color:#fff;font-size:18px;margin-bottom:20px;}
+pre{white-space:pre-wrap;word-break:break-all;font-size:10px;color:#94a3b8;max-height:300px;overflow-y:auto;background:#0f172a;padding:10px;border-radius:6px;margin-top:8px;}
+</style></head>
+<body>
+<h1>🔍 Deep Diagnostic — tracker_data_v1 + all sources</h1>
+<div id="output">Loading...</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyCQpHQb_j0pn2SRUmKR5wUGaf4bYH_3yi0",
+  authDomain:"time-schedule-tracker.firebaseapp.com",
+  projectId:"time-schedule-tracker",
+  storageBucket:"time-schedule-tracker.firebasestorage.app",
+  messagingSenderId:"67296866406",
+  appId:"1:67296866406:web:7a7656b5f5b7ed20ec7da7"
+});
+const db = firebase.firestore();
+
+async function diagnose(){
+  const out = document.getElementById('output');
+  let html = '';
+
+  // Check tracker_data_v1 (the OLDER backup with real data)
+  html += '<div class="box"><strong>📦 tracker_data_v1 (older backup)</strong><br>';
+  try{
+    const s = await db.collection('tracker').doc('tracker_data_v1').get();
+    if(s.exists){
+      const d = s.data();
+      html += `Members: <span class="${(d.members||[]).length>0?'ok':'bad'}">${(d.members||[]).length}</span><br>`;
+      html += `Master Tasks: <span class="${(d.masterTasks||[]).length>0?'ok':'bad'}">${(d.masterTasks||[]).length}</span><br>`;
+      html += `Activity Log: <span class="${(d.actLog||[]).length>0?'ok':'bad'}">${(d.actLog||[]).length}</span><br>`;
+      html += `Daily Status dates: <span class="${Object.keys(d.dailyStatus||{}).length>0?'ok':'bad'}">${Object.keys(d.dailyStatus||{}).length}</span><br>`;
+      if(d.dailyStatus) html += `Dates found: ${Object.keys(d.dailyStatus).join(', ')}<br>`;
+      html += `Volume dates: ${Object.keys(d.volume||{}).length}<br>`;
+    } else {
+      html += '<span class="bad">Document does not exist</span>';
+    }
+  }catch(e){html += '<span class="bad">Error: '+e.message+'</span>';}
+  html += '</div>';
+
+  // List ALL documents in tracker collection
+  html += '<div class="box"><strong>📂 ALL documents in "tracker" collection</strong><br>';
+  try{
+    const snap = await db.collection('tracker').get();
+    if(snap.empty){
+      html += '<span class="bad">No documents found</span>';
+    } else {
+      snap.forEach(doc=>{
+        const d = doc.data();
+        html += `<br><strong>${doc.id}</strong>: members=${(d.members||[]).length}, tasks=${(d.masterTasks||[]).length}, logs=${(d.actLog||[]).length}, dailyDates=${Object.keys(d.dailyStatus||{}).length}`;
+      });
+    }
+  }catch(e){html += '<span class="bad">Error: '+e.message+'</span>';}
+  html += '</div>';
+
+  // Show exact dailyStatus dates in tracker_v2
+  html += '<div class="box"><strong>🔬 tracker_v2 — exact dailyStatus content</strong><br>';
+  try{
+    const s = await db.collection('tracker').doc('tracker_v2').get();
+    const d = s.data() || {};
+    html += `<pre>${JSON.stringify(d.dailyStatus || {}, null, 2).slice(0,2000)}</pre>`;
+  }catch(e){html += '<span class="bad">Error: '+e.message+'</span>';}
+  html += '</div>';
+
+  // Show exact actLog content in tracker_v2
+  html += '<div class="box"><strong>🔬 tracker_v2 — exact actLog content (full)</strong><br>';
+  try{
+    const s = await db.collection('tracker').doc('tracker_v2').get();
+    const d = s.data() || {};
+    html += `<pre>${JSON.stringify(d.actLog || [], null, 2).slice(0,2000)}</pre>`;
+  }catch(e){html += '<span class="bad">Error: '+e.message+'</span>';}
+  html += '</div>';
+
+  // Show eh_v1/logs actLog content for comparison
+  html += '<div class="box"><strong>🔬 eh_v1/logs — exact actLog content (first 5 entries)</strong><br>';
+  try{
+    const s = await db.collection('eh_v1').doc('logs').get();
+    const d = s.data() || {};
+    const logs = (d.actLog||[]).slice(0,5);
+    html += `<pre>${JSON.stringify(logs, null, 2)}</pre>`;
+  }catch(e){html += '<span class="bad">Error: '+e.message+'</span>';}
+  html += '</div>';
+
+  out.innerHTML = html;
+}
+diagnose();
+</script>
+</body></html>
