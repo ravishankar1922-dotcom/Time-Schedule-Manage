@@ -91,6 +91,40 @@ async function diagnose(){
   }catch(e){html += '<span class="bad">Error: '+e.message+'</span>';}
   html += '</div>';
 
+  // Check eh_v1/tasks exact content
+  html += '<div class="box"><strong>🔬 eh_v1/tasks — exact content</strong><br>';
+  try{
+    const s = await db.collection('eh_v1').doc('tasks').get();
+    if(s.exists){
+      const d = s.data();
+      html += `Exists: <span class="ok">YES</span><br>`;
+      html += `masterTasks array length: <span class="${(d.masterTasks||[]).length>0?'ok':'bad'}">${(d.masterTasks||[]).length}</span><br>`;
+      html += `Raw keys in document: ${Object.keys(d).join(', ')}<br>`;
+      if((d.masterTasks||[]).length>0){
+        html += `<pre>First task: ${JSON.stringify(d.masterTasks[0], null, 2)}</pre>`;
+      }
+    } else {
+      html += '<span class="bad">Document does not exist!</span>';
+    }
+  }catch(e){html += '<span class="bad">Error: '+e.message+'</span>';}
+  html += '</div>';
+
+  // Check eh_v1/daily exact content
+  html += '<div class="box"><strong>🔬 eh_v1/daily — exact content</strong><br>';
+  try{
+    const s = await db.collection('eh_v1').doc('daily').get();
+    if(s.exists){
+      const d = s.data();
+      html += `Exists: <span class="ok">YES</span><br>`;
+      html += `dailyStatus dates: <span class="${Object.keys(d.dailyStatus||{}).length>0?'ok':'bad'}">${Object.keys(d.dailyStatus||{}).length}</span><br>`;
+      html += `Dates: ${Object.keys(d.dailyStatus||{}).join(', ')}<br>`;
+      html += `Raw keys in document: ${Object.keys(d).join(', ')}<br>`;
+    } else {
+      html += '<span class="bad">Document does not exist!</span>';
+    }
+  }catch(e){html += '<span class="bad">Error: '+e.message+'</span>';}
+  html += '</div>';
+
   out.innerHTML = html;
 }
 diagnose();
