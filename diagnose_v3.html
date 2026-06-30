@@ -67,7 +67,7 @@ async function diagnose(){
   html += '</div>';
 
   // Check if any of today's task IDs exist in the NEW tasks array
-  html += '<div class="box"><strong>🔎 Cross-check: do today\\'s completed task IDs exist in NEW masterTasks?</strong><br>';
+  html += '<div class="box"><strong>🔎 Cross-check: do completed task IDs exist in NEW masterTasks?</strong><br>';
   const newTaskIds = new Set(tasks.map(t=>t.id));
   let matchCount = 0, mismatchCount = 0;
   Object.keys(todayData).forEach(id=>{
