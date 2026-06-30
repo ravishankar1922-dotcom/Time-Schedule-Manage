@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Live Status Check</title>
+<style>
+body{font-family:monospace;background:#0f172a;color:#e2e8f0;padding:30px;font-size:13px;line-height:1.8;}
+.box{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:18px;margin-bottom:14px;}
+.ok{color:#34d399;}
+.bad{color:#f87171;}
+h1{color:#fff;font-size:18px;margin-bottom:20px;}
+</style></head>
+<body>
+<h1>🔍 Quick Connectivity Check</h1>
+<div id="output">Testing...</div>
+
+<script>
+async function check(){
+  const out = document.getElementById('output');
+  let html = '';
+
+  // Test 1: Can we load Firebase scripts at all?
+  html += '<div class="box"><strong>1️⃣ Firebase script loading test</strong><br>';
+  try{
+    const s1 = document.createElement('script');
+    s1.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
+    const loaded = await new Promise((res)=>{
+      s1.onload = ()=>res(true);
+      s1.onerror = ()=>res(false);
+      document.head.appendChild(s1);
+      setTimeout(()=>res(false), 5000);
+    });
+    html += loaded ? '<span class="ok">✓ Firebase app script loaded successfully</span>' : '<span class="bad">✗ Firebase script FAILED to load (network/CDN blocked?)</span>';
+  }catch(e){html += '<span class="bad">✗ Error: '+e.message+'</span>';}
+  html += '</div>';
+
+  // Test 2: Can we reach Firestore directly via REST?
+  html += '<div class="box"><strong>2️⃣ Firestore REST API direct test</strong><br>';
+  try{
+    const resp = await fetch('https://firestore.googleapis.com/v1/projects/time-schedule-tracker/databases/(default)/documents/eh_v1/config?key=AIzaSyCQpHQb_j0pn2SRUmKR5wUGaf4bYH_3yi0');
+    if(resp.ok){
+      const data = await resp.json();
+      const memberCount = (data.fields?.members?.arrayValue?.values||[]).length;
+      html += `<span class="ok">✓ Firestore reachable. eh_v1/config has ${memberCount} members</span>`;
+    } else {
+      html += `<span class="bad">✗ Firestore returned status ${resp.status}</span>`;
+    }
+  }catch(e){html += '<span class="bad">✗ Network error: '+e.message+'</span>';}
+  html += '</div>';
+
+  // Test 3: Current page info
+  html += '<div class="box"><strong>3️⃣ Current page context</strong><br>';
+  html += `URL: ${window.location.href}<br>`;
+  html += `User Agent: ${navigator.userAgent.slice(0,80)}<br>`;
+  html += '</div>';
+
+  out.innerHTML = html;
+}
+check();
+</script>
+</body></html>
