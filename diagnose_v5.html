@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Recovery Source Check</title>
+<style>
+body{font-family:monospace;background:#0f172a;color:#e2e8f0;padding:30px;font-size:13px;line-height:1.8;}
+.box{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:18px;margin-bottom:14px;}
+.ok{color:#34d399;}
+.bad{color:#f87171;}
+h1{color:#fff;font-size:18px;margin-bottom:20px;}
+pre{white-space:pre-wrap;word-break:break-all;font-size:10px;color:#94a3b8;}
+</style></head>
+<body>
+<h1>🔍 Checking ALL possible data sources for pre-5pm completions</h1>
+<div id="output">Loading...</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyCQpHQb_j0pn2SRUmKR5wUGaf4bYH_3yi0",
+  authDomain:"time-schedule-tracker.firebaseapp.com",
+  projectId:"time-schedule-tracker",
+  storageBucket:"time-schedule-tracker.firebasestorage.app",
+  messagingSenderId:"67296866406",
+  appId:"1:67296866406:web:7a7656b5f5b7ed20ec7da7"
+});
+const db = firebase.firestore();
+
+async function check(){
+  const out = document.getElementById('output');
+  let html = '';
+  const todayKey = new Date().toISOString().slice(0,10);
+
+  // Check 1: tracker_v2 (the OLD single-document architecture) - might still have pre-5pm data
+  html += '<div class="box"><strong>1️⃣ tracker_v2 — dailyStatus for today</strong><br>';
+  try{
+    const s = await db.collection('tracker').doc('tracker_v2').get();
+    const d = s.data()||{};
+    const td = (d.dailyStatus||{})[todayKey] || {};
+    const count = Object.keys(td).length;
+    html += `Entries: <span class="${count>0?'ok':'bad'}">${count}</span><br>`;
+    if(count>0) html += `<pre>${JSON.stringify(td,null,2).slice(0,1500)}</pre>`;
+  }catch(e){html+='<span class="bad">Error: '+e.message+'</span>';}
+  html += '</div>';
+
+  // Check 2: tracker_data_v1
+  html += '<div class="box"><strong>2️⃣ tracker_data_v1 — dailyStatus for today</strong><br>';
+  try{
+    const s = await db.collection('tracker').doc('tracker_data_v1').get();
+    const d = s.data()||{};
+    const td = (d.dailyStatus||{})[todayKey] || {};
+    const count = Object.keys(td).length;
+    html += `Entries: <span class="${count>0?'ok':'bad'}">${count}</span><br>`;
+    if(count>0) html += `<pre>${JSON.stringify(td,null,2).slice(0,1500)}</pre>`;
+  }catch(e){html+='<span class="bad">Error: '+e.message+'</span>';}
+  html += '</div>';
+
+  // Check 3: presence collection - might show WHO was active and WHEN before 5pm
+  // This won't recover task completions but confirms team activity timeline
+  html += '<div class="box"><strong>3️⃣ presence collection — activity timeline (proves team was active)</strong><br>';
+  try{
+    const snap = await db.collection('presence').get();
+    snap.forEach(doc=>{
+      const d = doc.data();
+      Object.entries(d).forEach(([name,info])=>{
+        if(info.loginAt){
+          const ist = new Date(info.loginAt).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',hour12:true});
+          html += `${name}: logged in at ${ist} IST, last tab: ${info.tab}<br>`;
+        }
+      });
+    });
+  }catch(e){html+='<span class="bad">Error: '+e.message+'</span>';}
+  html += '</div>';
+
+  // Check 4: List ALL top-level documents across ALL collections we know about
+  html += '<div class="box"><strong>4️⃣ Full inventory — every collection and document we can see</strong><br>';
+  for(const colName of ['tracker','eh_v1','presence']){
+    try{
+      const snap = await db.collection(colName).get();
+      html += `<strong>${colName}/</strong><br>`;
+      snap.forEach(doc=>{ html += `&nbsp;&nbsp;- ${doc.id}<br>`; });
+    }catch(e){html+=`${colName}: error<br>`;}
+  }
+  html += '</div>';
+
+  // Check 5: actLog full text search for anything completed before 5pm with specific keywords
+  html += '<div class="box"><strong>5️⃣ eh_v1/logs — ANY entry timestamped before 17:00 today</strong><br>';
+  try{
+    const s = await db.collection('eh_v1').doc('logs').get();
+    const logs = (s.data()||{}).actLog || [];
+    const todayLogs = logs.filter(l=>l.time && l.time.startsWith(todayKey));
+    const beforeLogs = todayLogs.filter(l=>{
+      const ist = new Date(l.time).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour12:false,hour:'2-digit'});
+      return parseInt(ist) < 17;
+    });
+    html += `Total today: ${todayLogs.length}, Before 5pm: <span class="${beforeLogs.length>0?'ok':'bad'}">${beforeLogs.length}</span><br>`;
+    beforeLogs.forEach(l=>{
+      const ist = new Date(l.time).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',hour12:true});
+      html += `${ist}: ${l.user} — ${l.msg}<br>`;
+    });
+  }catch(e){html+='<span class="bad">Error: '+e.message+'</span>';}
+  html += '</div>';
+
+  out.innerHTML = html;
+}
+check();
+</script>
+</body></html>
