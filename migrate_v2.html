@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Execution Hub — Migration to eh_v1</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.wrap{max-width:620px;width:100%;}
+.card{background:#1e293b;border-radius:20px;padding:36px;margin-bottom:16px;box-shadow:0 20px 60px rgba(0,0,0,.4);}
+.logo{width:52px;height:52px;background:#c8102e;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#fff;margin:0 auto 16px;}
+h1{font-size:21px;font-weight:800;text-align:center;margin-bottom:6px;}
+.sub{font-size:13px;color:#64748b;text-align:center;margin-bottom:28px;}
+.warn{background:#1c1000;border:1px solid #f59e0b;border-radius:10px;padding:14px 16px;font-size:12.5px;color:#fbbf24;line-height:1.7;margin-bottom:24px;}
+.steps{display:flex;flex-direction:column;gap:8px;margin-bottom:24px;}
+.step{display:flex;align-items:center;gap:12px;background:#0f172a;border-radius:10px;padding:12px 14px;border:1px solid #1e3a5f;}
+.sn{width:30px;height:30px;border-radius:50%;background:#1e3a5f;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;transition:all .3s;}
+.sn.done{background:#10b981;color:#fff;}
+.sn.active{background:#6366f1;color:#fff;animation:pulse 1.5s infinite;}
+.sn.err{background:#ef4444;color:#fff;}
+.st{font-size:12.5px;color:#94a3b8;flex:1;}
+.st strong{color:#fff;display:block;margin-bottom:2px;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.6;}}
+.status{background:#0f172a;border:1px solid #334155;border-radius:12px;padding:16px;margin-bottom:20px;font-size:12.5px;line-height:1.8;color:#64748b;min-height:60px;transition:all .3s;}
+.status.ok{border-color:#10b981;color:#34d399;}
+.status.err{border-color:#ef4444;color:#f87171;}
+.status.run{border-color:#6366f1;color:#a5b4fc;}
+.btn{width:100%;padding:15px;background:linear-gradient(135deg,#1d4ed8,#4f46e5);border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:800;cursor:pointer;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+.stat{background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;padding:12px;text-align:center;}
+.sv{font-size:20px;font-weight:900;color:#818cf8;}
+.sl{font-size:10px;color:#475569;font-weight:600;margin-top:3px;text-transform:uppercase;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="logo">D</div>
+    <h1>Execution Hub — Restore to eh_v1</h1>
+    <div class="sub">Copies your REAL data from tracker_v2 into the new eh_v1 architecture</div>
+
+    <div class="warn">
+      ⚠️ <strong>What happened:</strong> The new app version reads from eh_v1/* documents, but those were never populated — they were empty. The app treated this as a fresh install. Your real data is still 100% safe in <code>tracker_v2</code> — this tool copies it across, it does not delete anything.
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="sv" id="stM">—</div><div class="sl">Members</div></div>
+      <div class="stat"><div class="sv" id="stT">—</div><div class="sl">Tasks</div></div>
+      <div class="stat"><div class="sv" id="stL">—</div><div class="sl">Log entries</div></div>
+      <div class="stat"><div class="sv" id="stD">—</div><div class="sl">Daily records</div></div>
+    </div>
+
+    <div class="steps">
+      <div class="step"><div class="sn" id="s1">1</div><div class="st"><strong>Read tracker_v2</strong>Your real, untouched data</div></div>
+      <div class="step"><div class="sn" id="s2">2</div><div class="st"><strong>Write eh_v1/config</strong>Members · Passwords · Settings</div></div>
+      <div class="step"><div class="sn" id="s3">3</div><div class="st"><strong>Write eh_v1/tasks</strong>Master tasks · Leadership activities</div></div>
+      <div class="step"><div class="sn" id="s4">4</div><div class="st"><strong>Write eh_v1/daily</strong>Status · Volume · proof attachments</div></div>
+      <div class="step"><div class="sn" id="s5">5</div><div class="st"><strong>Write eh_v1/logs</strong>Full activity log history</div></div>
+      <div class="step"><div class="sn" id="s6">6</div><div class="st"><strong>Verify</strong>Confirm all 4 documents correct</div></div>
+    </div>
+
+    <div class="status run" id="statusBox">Ready. Click below to restore.</div>
+    <button class="btn" id="migrateBtn" onclick="runMigration()">▶ Restore Real Data to eh_v1</button>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyCQpHQb_j0pn2SRUmKR5wUGaf4bYH_3yi0",
+  authDomain:"time-schedule-tracker.firebaseapp.com",
+  projectId:"time-schedule-tracker",
+  storageBucket:"time-schedule-tracker.firebasestorage.app",
+  messagingSenderId:"67296866406",
+  appId:"1:67296866406:web:7a7656b5f5b7ed20ec7da7"
+});
+const db = firebase.firestore();
+
+function step(n, state='active'){
+  const el=document.getElementById('s'+n);
+  el.className='sn '+state;
+  el.textContent=state==='done'?'✓':state==='err'?'✗':n;
+}
+function status(msg,type='run'){
+  const b=document.getElementById('statusBox');
+  b.className='status '+type;
+  b.innerHTML=msg;
+}
+function setStat(id,val){document.getElementById(id).textContent=val;}
+
+async function runMigration(){
+  const btn=document.getElementById('migrateBtn');
+  btn.disabled=true;
+
+  try{
+    step(1);
+    status('⏳ Reading tracker_v2 (and tracker_data_v1 as fallback)...');
+
+    const [snapV2, snapV1, snapEh] = await Promise.all([
+      db.collection('tracker').doc('tracker_v2').get(),
+      db.collection('tracker').doc('tracker_data_v1').get(),
+      db.collection('eh_v1').doc('config').get()
+    ]);
+
+    let src = {};
+    if(snapV2.exists) src = {...snapV2.data()};
+
+    if(snapV1.exists){
+      const v1 = snapV1.data();
+      if((!src.members||src.members.length===0)&&v1.members) src.members=v1.members;
+      if((!src.masterTasks||src.masterTasks.length===0)&&v1.masterTasks) src.masterTasks=v1.masterTasks;
+      if((!src.masterLeadership||src.masterLeadership.length===0)&&v1.masterLeadership) src.masterLeadership=v1.masterLeadership;
+      if((!src.passwords||Object.keys(src.passwords||{}).length===0)&&v1.passwords) src.passwords=v1.passwords;
+      if((!src.weekendConfig)&&v1.weekendConfig) src.weekendConfig=v1.weekendConfig;
+      if((!src.holidays||src.holidays.length===0)&&v1.holidays) src.holidays=v1.holidays;
+      if((!src.volume||Object.keys(src.volume||{}).length===0)&&v1.volume) src.volume=v1.volume;
+    }
+
+    // CRITICAL: If eh_v1/config already has MORE members than tracker_v2 source,
+    // it means someone already used the app post-migration — don't downgrade
+    if(snapEh.exists){
+      const ehData = snapEh.data();
+      if(ehData.members && ehData.members.length > (src.members||[]).length){
+        status('⚠️ eh_v1/config already has more members than tracker_v2. Aborting to avoid downgrade. Contact support before proceeding.','err');
+        btn.disabled=false;
+        return;
+      }
+    }
+
+    const members     = src.members||[];
+    const passwords   = src.passwords||{};
+    const masterTasks = src.masterTasks||[];
+    const masterLD    = src.masterLeadership||[];
+    const dailyStatus = src.dailyStatus||{};
+    const ldStatus    = src.ldStatus||{};
+    const volume      = src.volume||{};
+    const holidays    = src.holidays||[];
+    const weekendCfg  = src.weekendConfig||{sat:'2nd-4th',sun:'all-off'};
+    const actLog      = src.actLog||[];
+
+    setStat('stM', members.length);
+    setStat('stT', masterTasks.length);
+    setStat('stL', actLog.length);
+    setStat('stD', Object.keys(dailyStatus).length);
+
+    if(members.length === 0){
+      status('❌ tracker_v2 also has 0 members. Cannot proceed — please check Firebase console manually.','err');
+      btn.disabled=false;
+      return;
+    }
+
+    status(`✓ Found ${members.length} members · ${masterTasks.length} tasks · ${actLog.length} logs · ${Object.keys(dailyStatus).length} daily records`);
+    step(1,'done');
+
+    step(2);
+    status('⏳ Writing eh_v1/config...');
+    await db.collection('eh_v1').doc('config').set({
+      members, passwords, weekendConfig:weekendCfg, holidays,
+      _restoredAt: new Date().toISOString()
+    });
+    step(2,'done');
+
+    step(3);
+    status('⏳ Writing eh_v1/tasks...');
+    await db.collection('eh_v1').doc('tasks').set({
+      masterTasks, masterLeadership:masterLD,
+      _restoredAt: new Date().toISOString()
+    });
+    step(3,'done');
+
+    step(4);
+    status('⏳ Writing eh_v1/daily...');
+    await db.collection('eh_v1').doc('daily').set({
+      dailyStatus, ldStatus, volume,
+      _restoredAt: new Date().toISOString()
+    });
+    step(4,'done');
+
+    step(5);
+    status('⏳ Writing eh_v1/logs...');
+    actLog.unshift({msg:'Data restored from tracker_v2 to eh_v1 after empty-migration incident',user:'System',time:new Date().toISOString()});
+    await db.collection('eh_v1').doc('logs').set({
+      actLog: actLog.slice(0,500),
+      _restoredAt: new Date().toISOString()
+    });
+    step(5,'done');
+
+    step(6);
+    status('⏳ Verifying...');
+    const verify = await db.collection('eh_v1').doc('config').get();
+    const vCount = (verify.data()?.members||[]).length;
+    if(vCount === 0){
+      step(6,'err');
+      status('❌ Verification failed.','err');
+      btn.disabled=false;
+      return;
+    }
+    step(6,'done');
+
+    status(`
+      ✅ <strong>RESTORE COMPLETE</strong><br><br>
+      ✓ eh_v1/config — ${vCount} members restored<br>
+      ✓ eh_v1/tasks  — ${masterTasks.length} tasks restored<br>
+      ✓ eh_v1/daily  — ${Object.keys(dailyStatus).length} days restored<br>
+      ✓ eh_v1/logs   — ${actLog.length} log entries restored<br><br>
+      <strong>Open Execution Hub now — refresh — all members are back.</strong>
+    `,'ok');
+
+  }catch(e){
+    status('❌ Error: '+e.message,'err');
+    btn.disabled=false;
+  }
+}
+</script>
+</body>
+</html>
