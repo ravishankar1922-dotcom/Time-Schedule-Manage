@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Emergency Data Check</title>
+<style>
+body{font-family:monospace;background:#0f172a;color:#e2e8f0;padding:30px;font-size:13px;line-height:1.8;}
+.box{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:18px;margin-bottom:14px;}
+.ok{color:#34d399;}.bad{color:#f87171;}.warn{color:#fbbf24;}
+h1{color:#fff;font-size:18px;margin-bottom:20px;}
+pre{white-space:pre-wrap;word-break:break-all;font-size:10px;color:#94a3b8;max-height:300px;overflow-y:auto;background:#0f172a;padding:10px;border-radius:6px;margin-top:8px;}
+</style></head>
+<body>
+<h1>🚨 Emergency Data Check — What exists right now</h1>
+<div id="output">Checking...</div>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyCQpHQb_j0pn2SRUmKR5wUGaf4bYH_3yi0",
+  authDomain:"time-schedule-tracker.firebaseapp.com",
+  projectId:"time-schedule-tracker",
+  storageBucket:"time-schedule-tracker.firebasestorage.app",
+  messagingSenderId:"67296866406",
+  appId:"1:67296866406:web:7a7656b5f5b7ed20ec7da7"
+});
+const db = firebase.firestore();
+
+async function check(){
+  const out = document.getElementById('output');
+  let html = '';
+
+  // Check ALL docs in eh_v1
+  html += '<div class="box"><strong>📁 eh_v1/config</strong><br>';
+  try{
+    const s = await db.collection('eh_v1').doc('config').get();
+    const d = s.data()||{};
+    html += `Members: <span class="${(d.members||[]).length>1?'ok':'bad'}">${(d.members||[]).length}</span><br>`;
+    html += `Passwords: ${Object.keys(d.passwords||{}).length}<br>`;
+    html += `Restored/Migrated at: ${d._restoredAt||d._migratedAt||'never'}<br>`;
+    html += `leaveAssignments: ${JSON.stringify(d.leaveAssignments||{}).slice(0,100)}<br>`;
+  }catch(e){html+='<span class="bad">'+e.message+'</span>';}
+  html += '</div>';
+
+  html += '<div class="box"><strong>📁 eh_v1/tasks</strong><br>';
+  try{
+    const s = await db.collection('eh_v1').doc('tasks').get();
+    const d = s.data()||{};
+    html += `Master Tasks: <span class="${(d.masterTasks||[]).length>0?'ok':'bad'}">${(d.masterTasks||[]).length}</span><br>`;
+    html += `Leadership Activities: ${(d.masterLeadership||[]).length}<br>`;
+    html += `Restored at: ${d._restoredAt||'never'}<br>`;
+  }catch(e){html+='<span class="bad">'+e.message+'</span>';}
+  html += '</div>';
+
+  html += '<div class="box"><strong>📁 eh_v1/daily — ALL dates with data</strong><br>';
+  try{
+    const s = await db.collection('eh_v1').doc('daily').get();
+    const d = s.data()||{};
+    const dates = Object.keys(d.dailyStatus||{}).sort();
+    html += `Total dates: <span class="${dates.length>0?'ok':'bad'}">${dates.length}</span><br>`;
+    if(dates.length>0){
+      dates.forEach(dk=>{
+        const entries = Object.keys(d.dailyStatus[dk]||{});
+        const done = entries.filter(id=>d.dailyStatus[dk][id]?.status==='done').length;
+        html += `${dk}: ${entries.length} entries, ${done} done<br>`;
+      });
+    } else {
+      html += '<span class="bad">⚠️ NO DAILY DATA — all wiped</span><br>';
+    }
+    html += `Restored at: ${d._restoredAt||'never'}<br>`;
+  }catch(e){html+='<span class="bad">'+e.message+'</span>';}
+  html += '</div>';
+
+  html += '<div class="box"><strong>📁 eh_v1/logs — recent entries</strong><br>';
+  try{
+    const s = await db.collection('eh_v1').doc('logs').get();
+    const d = s.data()||{};
+    const logs = d.actLog||[];
+    html += `Total log entries: <span class="${logs.length>0?'ok':'bad'}">${logs.length}</span><br>`;
+    html += `<br>Last 10 entries:<pre>${logs.slice(0,10).map(l=>`${new Date(l.time).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})} — ${l.user}: ${l.msg}`).join('\n')}</pre>`;
+  }catch(e){html+='<span class="bad">'+e.message+'</span>';}
+  html += '</div>';
+
+  // Check tracker_v2 for any surviving data
+  html += '<div class="box"><strong>📦 tracker_v2 (old backup) — what survived?</strong><br>';
+  try{
+    const s = await db.collection('tracker').doc('tracker_v2').get();
+    const d = s.data()||{};
+    html += `Members: ${(d.members||[]).length}<br>`;
+    html += `Tasks: ${(d.masterTasks||[]).length}<br>`;
+    html += `Daily dates: <span class="${Object.keys(d.dailyStatus||{}).length>0?'ok':'bad'}">${Object.keys(d.dailyStatus||{}).length}</span><br>`;
+    if(d.dailyStatus){
+      Object.keys(d.dailyStatus).sort().forEach(dk=>{
+        const entries=Object.keys(d.dailyStatus[dk]||{});
+        const done=entries.filter(id=>d.dailyStatus[dk][id]?.status==='done').length;
+        html+=`${dk}: ${entries.length} entries, ${done} done<br>`;
+      });
+    }
+    html += `Logs: ${(d.actLog||[]).length}<br>`;
+  }catch(e){html+='<span class="bad">'+e.message+'</span>';}
+  html += '</div>';
+
+  // Check tracker_data_v1
+  html += '<div class="box"><strong>📦 tracker_data_v1 — what survived?</strong><br>';
+  try{
+    const s = await db.collection('tracker').doc('tracker_data_v1').get();
+    const d = s.data()||{};
+    html += `Members: ${(d.members||[]).length}<br>`;
+    html += `Tasks: ${(d.masterTasks||[]).length}<br>`;
+    html += `Daily dates: <span class="${Object.keys(d.dailyStatus||{}).length>0?'ok':'bad'}">${Object.keys(d.dailyStatus||{}).length}</span><br>`;
+    if(d.dailyStatus){
+      Object.keys(d.dailyStatus).sort().forEach(dk=>{
+        const entries=Object.keys(d.dailyStatus[dk]||{});
+        const done=entries.filter(id=>d.dailyStatus[dk][id]?.status==='done').length;
+        html+=`${dk}: ${entries.length} entries, ${done} done<br>`;
+      });
+    }
+  }catch(e){html+='<span class="bad">'+e.message+'</span>';}
+  html += '</div>';
+
+  out.innerHTML = html;
+}
+check();
+</script>
+</body></html>
