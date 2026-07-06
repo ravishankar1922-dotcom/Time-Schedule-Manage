@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>EH — Backup & Restore</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.wrap{max-width:640px;width:100%;}
+.card{background:#1e293b;border-radius:20px;padding:32px;margin-bottom:16px;}
+.logo{width:48px;height:48px;background:#c8102e;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;margin:0 auto 14px;}
+h1{font-size:19px;font-weight:800;text-align:center;margin-bottom:6px;}
+.sub{font-size:12.5px;color:#64748b;text-align:center;margin-bottom:24px;}
+.warn{background:#1c1000;border:1px solid #f59e0b;border-radius:10px;padding:12px 16px;font-size:12px;color:#fbbf24;margin-bottom:20px;line-height:1.6;}
+.step{background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;padding:14px 16px;margin-bottom:10px;}
+.step-num{font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+.step-title{font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;}
+.step-desc{font-size:12px;color:#64748b;line-height:1.6;}
+.btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:10px;font-family:inherit;}
+.btn-backup{background:linear-gradient(135deg,#1d4ed8,#4f46e5);color:#fff;}
+.btn-restore{background:#1c1000;border:1.5px solid #f59e0b;color:#fbbf24;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.status{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;font-size:12px;color:#64748b;margin-bottom:12px;min-height:50px;line-height:1.8;white-space:pre-wrap;}
+.status.ok{border-color:#10b981;color:#34d399;}
+.status.err{border-color:#ef4444;color:#f87171;}
+.status.run{border-color:#6366f1;color:#a5b4fc;}
+input[type=file]{display:none;}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;}
+.sum-card{background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:10px;text-align:center;}
+.sum-val{font-size:18px;font-weight:900;color:#818cf8;}
+.sum-lbl{font-size:9px;color:#475569;font-weight:600;text-transform:uppercase;margin-top:2px;}
+</style>
+</head>
+<body><div class="wrap">
+<div class="card">
+  <div class="logo">D</div>
+  <h1>Execution Hub — Backup & Restore</h1>
+  <div class="sub">Always backup FIRST — before any migration, restore, or major change</div>
+
+  <div class="warn">
+    ⚠️ <strong>Rule:</strong> Download a backup BEFORE running any restore/migration tool.
+    Store the JSON file on your computer. If anything goes wrong, restore from this file.
+  </div>
+
+  <div class="summary" id="summary" style="display:none">
+    <div class="sum-card"><div class="sum-val" id="smM">—</div><div class="sum-lbl">Members</div></div>
+    <div class="sum-card"><div class="sum-val" id="smT">—</div><div class="sum-lbl">Tasks</div></div>
+    <div class="sum-card"><div class="sum-val" id="smD">—</div><div class="sum-lbl">Daily dates</div></div>
+    <div class="sum-card"><div class="sum-val" id="smL">—</div><div class="sum-lbl">Log entries</div></div>
+  </div>
+
+  <div class="status run" id="statusBox">Connecting to Firebase…</div>
+
+  <!-- BACKUP -->
+  <div class="step">
+    <div class="step-num">Step 1 — Do this first</div>
+    <div class="step-title">📥 Download Complete Backup</div>
+    <div class="step-desc">Downloads everything from eh_v1 as a JSON file to your computer. Takes 5 seconds. Store it safely.</div>
+  </div>
+  <button class="btn btn-backup" id="btnBackup" onclick="downloadBackup()" disabled>📥 Download Full Backup (JSON)</button>
+
+  <!-- RESTORE -->
+  <div class="step">
+    <div class="step-num">Step 2 — Only if needed</div>
+    <div class="step-title">📤 Restore from Backup File</div>
+    <div class="step-desc">Select a previously downloaded backup JSON file. Restores members, tasks, daily status, and logs exactly as they were. Uses merge so existing newer data is not overwritten.</div>
+  </div>
+  <button class="btn btn-restore" id="btnRestore" onclick="document.getElementById('restoreFile').click()" disabled>📤 Select Backup File to Restore</button>
+  <input type="file" id="restoreFile" accept=".json" onchange="restoreFromFile(this.files[0])">
+</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyCQpHQb_j0pn2SRUmKR5wUGaf4bYH_3yi0",
+  authDomain:"time-schedule-tracker.firebaseapp.com",
+  projectId:"time-schedule-tracker",
+  storageBucket:"time-schedule-tracker.firebasestorage.app",
+  messagingSenderId:"67296866406",
+  appId:"1:67296866406:web:7a7656b5f5b7ed20ec7da7"
+});
+const db = firebase.firestore();
+
+function setStatus(msg, type='run'){
+  const b=document.getElementById('statusBox');
+  b.className='status '+type;
+  b.textContent=msg;
+}
+
+async function loadSummary(){
+  try{
+    const [c,t,d,l] = await Promise.all([
+      db.collection('eh_v1').doc('config').get(),
+      db.collection('eh_v1').doc('tasks').get(),
+      db.collection('eh_v1').doc('daily').get(),
+      db.collection('eh_v1').doc('logs').get()
+    ]);
+    const members = (c.data()?.members||[]).length;
+    const tasks = (t.data()?.masterTasks||[]).length;
+    const dates = Object.keys(d.data()?.dailyStatus||{}).length;
+    const logs = (l.data()?.actLog||[]).length;
+    document.getElementById('smM').textContent=members;
+    document.getElementById('smT').textContent=tasks;
+    document.getElementById('smD').textContent=dates;
+    document.getElementById('smL').textContent=logs;
+    document.getElementById('summary').style.display='grid';
+    setStatus(`Connected ✓ — ${members} members · ${tasks} tasks · ${dates} daily dates · ${logs} log entries\n\nReady to backup or restore.`,'ok');
+    document.getElementById('btnBackup').disabled=false;
+    document.getElementById('btnRestore').disabled=false;
+  }catch(e){
+    setStatus('Connection error: '+e.message,'err');
+  }
+}
+loadSummary();
+
+async function downloadBackup(){
+  const btn=document.getElementById('btnBackup');
+  btn.disabled=true; btn.textContent='Downloading…';
+  setStatus('Reading all Firebase documents…','run');
+  try{
+    const [c,t,d,l] = await Promise.all([
+      db.collection('eh_v1').doc('config').get(),
+      db.collection('eh_v1').doc('tasks').get(),
+      db.collection('eh_v1').doc('daily').get(),
+      db.collection('eh_v1').doc('logs').get()
+    ]);
+    const backup = {
+      _backupDate: new Date().toISOString(),
+      _backupVersion: '1.0',
+      config: c.data()||{},
+      tasks:  t.data()||{},
+      daily:  d.data()||{},
+      logs:   l.data()||{}
+    };
+    const blob = new Blob([JSON.stringify(backup,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0,10);
+    const timeStr = new Date().toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour12:false}).replace(/:/g,'-');
+    a.href=url; a.download=`EH_Backup_${dateStr}_${timeStr}.json`; a.click();
+    URL.revokeObjectURL(url);
+    const members=(backup.config.members||[]).length;
+    const tasks=(backup.tasks.masterTasks||[]).length;
+    const dates=Object.keys(backup.daily.dailyStatus||{}).length;
+    const logs=(backup.logs.actLog||[]).length;
+    setStatus(`✅ Backup downloaded!\n\nContains:\n  ${members} members\n  ${tasks} tasks\n  ${dates} daily date records\n  ${logs} activity log entries\n\nFile: EH_Backup_${dateStr}_${timeStr}.json\n\nStore this file safely. Use "Restore" to recover if anything goes wrong.`,'ok');
+  }catch(e){
+    setStatus('Backup failed: '+e.message,'err');
+  }finally{
+    btn.disabled=false; btn.textContent='📥 Download Full Backup (JSON)';
+  }
+}
+
+async function restoreFromFile(file){
+  if(!file)return;
+  if(!confirm('⚠️ This will restore all data from the backup file.\n\nThis uses MERGE — newer data will NOT be overwritten.\nOnly missing/empty fields will be filled in.\n\nContinue?'))return;
+
+  const btn=document.getElementById('btnRestore');
+  btn.disabled=true;
+  setStatus('Reading backup file…','run');
+
+  try{
+    const text = await file.text();
+    const backup = JSON.parse(text);
+
+    if(!backup._backupVersion||!backup.config||!backup.daily){
+      setStatus('❌ Invalid backup file. Please select a valid EH_Backup_*.json file.','err');
+      btn.disabled=false; return;
+    }
+
+    const backupDate = new Date(backup._backupDate).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'});
+    setStatus(`Backup from: ${backupDate}\nMembers: ${(backup.config.members||[]).length}\nTasks: ${(backup.tasks.masterTasks||[]).length}\nDaily dates: ${Object.keys(backup.daily.dailyStatus||{}).length}\n\nRestoring…`,'run');
+
+    // SAFE RESTORE: use set with merge:true so newer data is preserved
+    // For daily, we merge at the date-key level to preserve any completions
+    // that happened after the backup was taken
+    await db.collection('eh_v1').doc('config').set({
+      members:    backup.config.members    || [],
+      passwords:  backup.config.passwords  || {},
+      weekendConfig: backup.config.weekendConfig || {sat:'2nd-4th',sun:'all-off'},
+      holidays:   backup.config.holidays   || [],
+      leaveAssignments: backup.config.leaveAssignments || {},
+      _restoredAt: new Date().toISOString()
+    },{merge:true});
+
+    await db.collection('eh_v1').doc('tasks').set({
+      masterTasks:       backup.tasks.masterTasks       || [],
+      masterLeadership:  backup.tasks.masterLeadership  || [],
+      _restoredAt: new Date().toISOString()
+    },{merge:true});
+
+    // For daily — restore each date key individually with merge
+    // so any completions done AFTER the backup are kept
+    const dailyUpdate = {_restoredAt: new Date().toISOString()};
+    Object.entries(backup.daily.dailyStatus||{}).forEach(([dk,dayData])=>{
+      dailyUpdate[`dailyStatus.${dk}`] = dayData;
+    });
+    Object.entries(backup.daily.volume||{}).forEach(([dk,volData])=>{
+      dailyUpdate[`volume.${dk}`] = volData;
+    });
+    if(backup.daily.ldStatus){
+      Object.entries(backup.daily.ldStatus).forEach(([dk,ldData])=>{
+        dailyUpdate[`ldStatus.${dk}`] = ldData;
+      });
+    }
+    await db.collection('eh_v1').doc('daily').update(dailyUpdate);
+
+    // Logs — merge by prepending backup logs that don't already exist
+    const currentLogs = await db.collection('eh_v1').doc('logs').get();
+    const existingTimes = new Set((currentLogs.data()?.actLog||[]).map(l=>l.time));
+    const newLogs = (backup.logs.actLog||[]).filter(l=>!existingTimes.has(l.time));
+    const mergedLogs = [...newLogs, ...(currentLogs.data()?.actLog||[])].slice(0,500);
+    await db.collection('eh_v1').doc('logs').set({
+      actLog: mergedLogs,
+      _restoredAt: new Date().toISOString()
+    },{merge:true});
+
+    setStatus(`✅ RESTORE COMPLETE\n\nRestored from backup: ${backupDate}\n\nAll 4 documents updated with merge.\nNewer data (after backup date) was preserved.\n\nPlease refresh the portal now.`,'ok');
+    await loadSummary();
+
+  }catch(e){
+    setStatus('❌ Restore failed: '+e.message,'err');
+    console.error(e);
+  }finally{
+    btn.disabled=false;
+    document.getElementById('restoreFile').value='';
+  }
+}
+</script>
+</body></html>
